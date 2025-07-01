@@ -5,7 +5,7 @@ from argon2.exceptions import InvalidHash, VerifyMismatchError
 pwd_context = PasswordHasher()
 
 
-async def verify_password(plain_password: str, hashed_password: str) -> bool:
+def verify_password(plain_password: str, hashed_password: str) -> bool:
     try:
         return pwd_context.verify(hashed_password, plain_password)
     except VerifyMismatchError:

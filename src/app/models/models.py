@@ -51,7 +51,6 @@ class MatchResult(str, PyEnum):
 
 class MatchLog(Base):
     __tablename__ = "match_log"
-
     match_log_id = Column(Integer, primary_key=True, autoincrement=True)
 
     match_id = Column(Integer, ForeignKey("match.match_id"))

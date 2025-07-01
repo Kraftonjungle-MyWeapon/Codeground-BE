@@ -17,10 +17,10 @@ ALGORITHM = "HS256"
 from src.app.core.token import decode_token
 
 
-async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     try:
         email = decode_token(token)
-        user = await crud.get_user_by_email(db, email=email)
+        user = crud.get_user_by_email(db, email=email)
         if user is None:
             raise HTTPException(status_code=401, detail="User is None")
         return user
