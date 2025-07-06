@@ -34,12 +34,17 @@ class Settings(BaseSettings):
 
     @property
     def CORS_ALLOWED_ORIGINS(self) -> List[str]:
-        # 환경변수로 들어온 값을 파싱
-        raw = os.environ.get("CORS_ALLOWED_ORIGINS", "*")
-        if raw:
-            # 쉼표로 구분된 문자열을 리스트로 변환
+        # 환경 변수 ENV, ENVIRONMENT 기준으로 개발/운영 환경 판단 (둘 중 하나만 써도 됨)
+        env = (getattr(self, "ENV", None) or getattr(self, "ENVIRONMENT", None) or "local").lower()
+        if env in ["local"]:
+            # 개발환경: 환경변수에서 값을 받아오되 없으면 "*"로 모두 허용
+            raw = os.environ.get("CORS_ALLOWED_ORIGINS", "*")
+            if raw == "*":
+                return ["*"]
             return [o.strip() for o in raw.split(",") if o.strip()]
-        return []
-
+        elif env in ["dev", "DEV"]:
+            # 운영/배포환경: 환경변수에서 반드시 허용할 도메인만 리스트로 반환
+            raw = os.environ.get("CORS_ALLOWED_ORIGINS", "https://code-ground.com")
+            return [o.strip() for o in raw.split(",") if o.strip()]
 
 settings = Settings()
