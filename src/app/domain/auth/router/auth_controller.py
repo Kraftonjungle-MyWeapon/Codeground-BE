@@ -31,7 +31,8 @@ async def sign_up(sign_up_request: schemas.SignupRequest, db: DB, response: Resp
             httponly=True,
             max_age=60 * 60 * 24,
             secure=settings.ENV != "local",
-            samesite="lax",
+            samesite="none" if settings.ENV != "local" else "lax",
+            domain=".code-ground.com" if settings.ENV != "local" else None,
         )
 
         return schemas.TokenResponse(access_token=access_token, token_type="bearer")
@@ -61,7 +62,8 @@ async def login(
             httponly=True,
             max_age=60 * 60 * 24,
             secure=settings.ENV != "local",
-            samesite="lax",
+            samesite="none" if settings.ENV != "local" else "lax",
+            domain=".code-ground.com" if settings.ENV != "local" else None,
         )
 
         return {"access_token": access_token, "token_type": "bearer"}
