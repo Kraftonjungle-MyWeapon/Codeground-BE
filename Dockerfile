@@ -28,7 +28,6 @@ COPY pyproject.toml poetry.lock README.md alembic.ini ./
 
 # 7. src와 migration 폴더 모두 복사 (alembic migration 폴더 꼭 포함)
 COPY src/ ./src
-COPY migration/ ./migration
 
 # 8. Poetry로 패키지 설치 (메인 의존성만)
 RUN poetry install --only main --no-interaction --no-ansi
@@ -37,4 +36,4 @@ RUN poetry install --only main --no-interaction --no-ansi
 EXPOSE 8000
 
 # 10. 컨테이너 시작 시 Alembic migration → FastAPI 서버 실행 (둘 다 Poetry 환경에서)
-CMD ["bash", "-c", "poetry run alembic upgrade head && poetry run uvicorn src.app.main:app --host 0.0.0.0 --port 8000"]
+CMD ["poetry", "run", "uvicorn", "src.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
