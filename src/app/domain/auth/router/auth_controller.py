@@ -15,13 +15,15 @@ router = APIRouter()
 
 DB = Annotated[Session, Depends(get_db)]
 
+
 def get_cookie_options():
     if settings.ENV == "local":
         # 개발환경: 크로스도메인 문제 없으므로 lax, secure X
-        return False, "lax", None
+        return False, "lax", None, False
     else:
         # 운영/배포환경: cross-site 인증, https 강제
-        return True, "none", ".code-ground.com"
+        return True, "none", ".code-ground.com", True
+
 
 @router.post("/sign-up")
 async def sign_up(sign_up_request: schemas.SignupRequest, db: DB, response: Response):
@@ -34,11 +36,11 @@ async def sign_up(sign_up_request: schemas.SignupRequest, db: DB, response: Resp
         access_token = create_access_token(subject=str(sign_up_request.email))
 
         # 환경에 따라 쿠키 옵션 분기 (가독성 및 실수 방지)
-        secure, samesite, domain = get_cookie_options()
+        secure, samesite, domain, http_only = get_cookie_options()
         response.set_cookie(
             key="access_token",
             value=access_token,
-            httponly=True,
+            httponly=http_only,
             max_age=60 * 60 * 24,
             secure=secure,
             samesite=samesite,
@@ -59,20 +61,20 @@ async def sign_up(sign_up_request: schemas.SignupRequest, db: DB, response: Resp
 
 @router.post("/login")
 async def login(
-    db: DB,
-    response: Response,
-    form_data: OAuth2PasswordRequestForm = Depends(),
+        db: DB,
+        response: Response,
+        form_data: OAuth2PasswordRequestForm = Depends(),
 ):
     try:
         user = await service.authenticate_user(db, form_data.username, form_data.password)
         access_token = create_access_token(subject=user.email)
 
         # 환경에 따라 쿠키 옵션 분기 (가독성 및 실수 방지)
-        secure, samesite, domain = get_cookie_options()
+        secure, samesite, domain, http_only = get_cookie_options()
         response.set_cookie(
             key="access_token",
             value=access_token,
-            httponly=True,
+            httponly=http_only,
             max_age=60 * 60 * 24,
             secure=secure,
             samesite=samesite,
