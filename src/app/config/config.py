@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     @property
     def CORS_ALLOWED_ORIGINS(self) -> List[str]:
         # 환경변수로 들어온 값을 파싱
-        raw = os.environ.get("CORS_ALLOWED_ORIGINS", "")
+        raw = os.environ.get("CORS_ALLOWED_ORIGINS", "*")
         if raw:
             # 쉼표로 구분된 문자열을 리스트로 변환
             return [o.strip() for o in raw.split(",") if o.strip()]

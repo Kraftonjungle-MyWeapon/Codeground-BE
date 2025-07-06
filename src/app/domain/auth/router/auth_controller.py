@@ -24,7 +24,17 @@ async def sign_up(sign_up_request: schemas.SignupRequest, db: DB, response: Resp
         db.commit()
 
         access_token = create_access_token(subject=str(sign_up_request.email))
-        return schemas.TokenResponse(access_token=access_token)
+
+        response.set_cookie(
+            key="access_token",
+            value=access_token,
+            httponly=True,
+            max_age=60 * 60 * 24,
+            secure=settings.ENV != "local",
+            samesite="lax",
+        )
+
+        return schemas.TokenResponse(access_token=access_token, token_type="bearer")
 
     except HTTPException:
         db.rollback()
