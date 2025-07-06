@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from src.app.core.database import get_db
 from src.app.core.security import get_current_user
@@ -12,9 +12,13 @@ router = APIRouter()
 
 @router.get("/me", response_model=schemas.UserResponseDto)
 async def get_user_me(
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    print("===== [쿠키 값 출력] =====")
+    print(request.cookies)
+    print("========================")
     try:
         user = await service.get_user_data(db, current_user.user_id)
         user_mmr = await get_mmr_by_id(db, user.user_id)
