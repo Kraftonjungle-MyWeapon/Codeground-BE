@@ -42,6 +42,7 @@ async def sign_up(sign_up_request: schemas.SignupRequest, db: DB, response: Resp
             max_age=60 * 60 * 24,
             secure=secure,
             samesite=samesite,
+            path="/",
             domain=domain,
         )
 
@@ -75,6 +76,7 @@ async def login(
             max_age=60 * 60 * 24,
             secure=secure,
             samesite=samesite,
+            path="/",
             domain=domain,
         )
 
