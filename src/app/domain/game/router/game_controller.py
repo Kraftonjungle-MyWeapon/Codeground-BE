@@ -1,6 +1,7 @@
 from fastapi import Depends, WebSocket, WebSocketDisconnect, APIRouter, Query
 from src.app.utils.game_session import game_rooms, game_user_map, ready_status, disconnected_users
 import json
+import asyncio
 from src.app.domain.game.service.game_result_service import update_user_log, update_match, search_result, get_mmr_earned
 from typing import Annotated
 from sqlalchemy.orm import Session
@@ -9,11 +10,16 @@ from src.app.core.database import get_db
 router = APIRouter()
 DB = Annotated[Session, Depends(get_db)]
 
+# 새로고침 등으로 인한 일시적 끊김 후 재접속을 기다리는 시간 (초)
+RECONNECT_TIMEOUT = 5
+
 
 @router.websocket("/ws/game/{game_id}")
 async def game_websocket(db: DB, websocket: WebSocket, game_id: int, user_id: int = Query(...)):
     game_id = int(game_id)
     user_id = int(user_id)
+
+    await websocket.accept()
 
     # 인증: 해당 게임방에 참여할 자격이 있는지 확인
     if game_id not in game_user_map or user_id not in game_user_map[game_id]:
@@ -21,7 +27,6 @@ async def game_websocket(db: DB, websocket: WebSocket, game_id: int, user_id: in
         await websocket.close(code=4001)
         return
 
-    await websocket.accept()
     # 재연결 감지 및 알림
     if disconnected_users.get(game_id) == user_id:
         disconnected_users.pop(game_id, None)
@@ -56,22 +61,28 @@ async def game_websocket(db: DB, websocket: WebSocket, game_id: int, user_id: in
         # 상태 기록
         disconnected_users[game_id] = user_id
 
-        if game_rooms.get(game_id):
-            await broadcast_to_room(
-                game_id,
-                {
-                    "type": "opponent_left",
-                    "user_id": user_id,
-                    "game_id": game_id,
-                    "message": "상대방이 연결을 종료했습니다. 계속 문제를 푸시겠습니까?",
-                },
-            )
+        async def delayed_leave():
+            await asyncio.sleep(RECONNECT_TIMEOUT)
+            # 아직 재접속되지 않았다면 ‘완전 이탈’ 처리
+            if disconnected_users.get(game_id) == user_id:
+                # 상대방에게 이탈 알림
+                if game_rooms.get(game_id):
+                    await broadcast_to_room(
+                        game_id,
+                        {
+                            "type": "opponent_left",
+                            "user_id": user_id,
+                            "message": "상대방이 연결을 종료했습니다. 계속 문제를 푸시하시겠습니까?"
+                        }
+                    )
+                # 방 정리
+                if not game_rooms.get(game_id):
+                    game_rooms.pop(game_id, None)
+                    ready_status.pop(game_id, None)
+                    disconnected_users.pop(game_id, None)
 
-        # 마지막 유저까지 나갔으면 방 정리
-        if not game_rooms[game_id]:
-            game_rooms.pop(game_id, None)
-            ready_status.pop(game_id, None)
-            disconnected_users.pop(game_id, None)
+        # 백그라운드로 실행
+        asyncio.create_task(delayed_leave())
 
 
 async def handle_game_message(db, websocket: WebSocket, game_id: int, user_id: int, message: str):
