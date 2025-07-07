@@ -91,6 +91,8 @@ async def handle_accept(match_id: int, user_id: int, db: Session):
             user_cache.pop(uid, None)
         game_user_map[match.match_id] = users
 
+        print(f"[DEBUG] match_id: {match.match_id}, users: {users}, problem: {problem.problem_id}, difficulty: {problem.difficulty}")
+
         presigned = await issue_problem_urls(problem)
 
         msg = {
