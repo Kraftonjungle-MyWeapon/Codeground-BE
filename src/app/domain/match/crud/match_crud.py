@@ -1,8 +1,10 @@
 from src.app.models.models import MatchLog
-from typing import Optional
+from typing import Optional, Sequence
 from sqlalchemy.orm import Session
 from src.app.models.models import Match, UserMmr
+from sqlalchemy import select
 
+LOGS_PER_CLICK = 15
 
 async def get_mmr_by_id(db: Session, user_id: int) -> Optional[UserMmr]:  # User -> Optional[User]로 수정
     return db.query(UserMmr).filter(UserMmr.user_id == user_id).first()
@@ -27,12 +29,13 @@ async def create_match(db: Session, problem_id: int):
 async def create_match_logs(db: Session, match_id: int, user_ids: list[int], problem_id: int):
     user_a_mmr = await get_mmr_by_id(db, user_ids[0])
     user_b_mmr = await get_mmr_by_id(db, user_ids[1])
-
+    print(user_ids[0], user_ids[1], user_a_mmr.user_id, user_b_mmr.user_id)
     user_a_log = MatchLog(
         match_id=match_id,
         problem_id=problem_id,
-        user_id=user_ids[0],
+        user_id= user_ids[0],
         is_consumed=False,
+        opponent_id = user_b_mmr.user_id,
         opponent_mmr=user_b_mmr.rating,
         opponent_rd=user_b_mmr.rating_devi,
     )
@@ -42,14 +45,19 @@ async def create_match_logs(db: Session, match_id: int, user_ids: list[int], pro
         problem_id=problem_id,
         user_id=user_ids[1],
         is_consumed=False,
+        opponent_id=user_a_mmr.user_id,
         opponent_mmr=user_a_mmr.rating,
         opponent_rd=user_a_mmr.rating_devi,
     )
 
     db.add_all([user_a_log, user_b_log])
+    print("after flush:", user_a_log.opponent_id, user_b_log.opponent_id)
     db.commit()
     return
 
 
-async def get_match_logs_by_user_id(db: Session, user_id: int):
-    return db.query(MatchLog).filter(MatchLog.user_id == user_id).order_by(MatchLog.created_at.desc()).all()
+async def get_match_log_by_user_index(db: Session, user_id: int, index: int) -> Sequence[MatchLog]:
+    start = index * LOGS_PER_CLICK
+    stmt = (select(MatchLog).where(MatchLog.user_id == user_id).order_by(MatchLog.created_at.desc()).offset(start).limit(LOGS_PER_CLICK))
+    result = db.execute(stmt)
+    return result.scalars().all()

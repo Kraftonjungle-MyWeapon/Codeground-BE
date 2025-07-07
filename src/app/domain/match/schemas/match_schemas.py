@@ -2,7 +2,7 @@ from datetime import datetime
 from dataclasses import dataclass
 from typing import Optional
 from pydantic import BaseModel
-from src.app.models.models import MatchResult
+from src.app.models.models import MatchResult, ProblemDifficultyByTiers
 
 
 @dataclass
@@ -14,13 +14,14 @@ class MatchingUserInfo:
 
 
 class MatchLogSchema(BaseModel):
-    match_log_id: int
-    match_id: int
-    problem_id: int
     result: Optional[MatchResult]
-    mmr_earned: float
-    opponent_mmr: float
-    created_at: datetime
+    opponent_name : str
+    mmr_earned: int
+    opponent_tier: str
+    game_difficulty : ProblemDifficultyByTiers
+    game_time : datetime
+    game_title : str
 
     class Config:
         from_attributes = True
+        use_enum_values = True

@@ -5,10 +5,12 @@ from datetime import datetime, timezone
 import asyncio
 from sqlalchemy.orm import Session
 from src.app.domain.match.crud import match_crud
-from src.app.domain.user.crud.user_crud import get_user_mmr
-from src.app.models.models import Match
+from src.app.domain.user.crud.user_crud import get_user_mmr, get_user_by_id
+from src.app.models.models import Match, Problem
 from src.app.utils.tier_util import mmr_to_tier
 from src.app.utils.ws_manager import ws_manager
+from src.app.domain.match.schemas.match_schemas import MatchLogSchema
+from src.app.domain.game.crud.game_crud import get_problem_by_id
 
 from itertools import count
 
@@ -121,18 +123,37 @@ async def handle_match_timeout(match_id: int, users: list[int], timeout: int):
         ws_manager.match_state.pop(match_id, None)
 
 
-async def create_match_with_logs(db: Session, user_ids: list[int]) -> tuple[Match, int]:
+async def create_match_with_logs(db: Session, user_ids: list[int]) -> tuple[Match, Problem]:
     mmrs = [get_user_mmr(db, uid) for uid in user_ids]
     tiers = [mmr_to_tier(mmr) for mmr in mmrs]
-    problem = select_problem_for_tiers(db, tiers[0], tiers[1])
+    problem = await select_problem_for_tiers(db, tiers[0], tiers[1]) # 티어에 맞춰 랜덤 문제 반환
     match = await match_crud.create_match(db, problem.problem_id)
     await match_crud.create_match_logs(db, match.match_id, user_ids, problem.problem_id)
     db.commit()
-    return match, problem.problem_id
+    return match, problem
 
 
-async def get_match_logs_by_user_id(db: Session, user_id: int):
-    return await match_crud.get_match_logs_by_user_id(db, user_id)
+async def get_match_logs_by_user_id(db: Session, user_id: int, counts: int):
+    logs_return_list = []
+
+    logs = await match_crud.get_match_log_by_user_index(db, user_id, counts)
+    if not logs:
+        return None
+
+    for log in logs:
+        problem_id = log.problem_id
+        game = await get_problem_by_id(db, problem_id)
+        result = log.result
+        opponent_tier = mmr_to_tier(int(log.opponent_mmr))
+        opponent = get_user_by_id(db, log.opponent_id)
+        opponent_nick = opponent.nickname
+        game_time = log.created_at
+        difficultly = str(game.difficulty.value)
+        earned = int(log.mmr_earned)
+        title = str(game.title)
+        result = MatchLogSchema( result = result, mmr_earned = earned,opponent_name = opponent_nick ,opponent_tier = opponent_tier, game_difficulty = difficultly, game_time = game_time, game_title=title )
+        logs_return_list.append(result)
+    return logs_return_list
 
 
 match_service = MatchService()

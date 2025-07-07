@@ -1,7 +1,7 @@
 from src.app.domain.match.utils.mmr_measure import full_update, MatchScore
 from src.app.models.models import MatchResult, MatchFinishStatus, MatchStatus
 from src.app.domain.match.crud.match_crud import get_log_by_id, get_mmr_by_id, get_log_by_game_id
-from src.app.domain.ranking.crud.ranking_crud import get_rank_by_id
+from src.app.domain.ranking.crud.ranking_crud import get_rank_by_id, get_users_in_mmr_range
 from src.app.domain.ranking.service.ranking_service import create_rank
 from sqlalchemy.orm import Session
 from src.app.models.models import Match
@@ -50,6 +50,35 @@ async def update_user_mmr(db: Session, game_id: int, user_id: int) -> None:
     match_log.mmr_earned = new_rate - ori_mmr
     match_log.is_consumed = True
     user_rank.mmr = int(new_rate)
+
+    # update_users = await get_users_in_mmr_range(db,min(ori_mmr, new_rate), max(ori_mmr, new_rate))
+    # if len(update_users) <= 1 :
+    #     db.commit()
+    #     return
+    #
+    # # 패배 시
+    # if ori_mmr > new_rate:
+    #     ori_rank = user_rank.rank
+    #     user_rank.rank_diff = user_rank.rank - update_users[-1].rank
+    #     user_rank.rank = update_users[-1].rank
+    #     for user in update_users:
+    #         if user == user_rank or user.rank < ori_rank:
+    #             continue
+    #         user.rank -= 1
+    #         user.rank_diff += 1
+    #
+    # #승리 시
+    # else:
+    #     ori_rank = user_rank.rank
+    #     user_rank.rank_diff = user_rank.rank - update_users[0].rank
+    #     user_rank.rank = update_users[0].rank
+    #
+    #     for user in update_users:
+    #         if user == user_rank or user.rank > ori_rank:
+    #             continue
+    #         user.rank += 1
+    #         user.rank_diff -= 1
+
     db.commit()
     return
 
