@@ -32,7 +32,7 @@ class UserResponseDto(BaseModel):
     nickname: str
     use_lang: str
     user_mmr: int
-
+    user_rank : int
     model_config = {"from_attributes": True}
 
 
