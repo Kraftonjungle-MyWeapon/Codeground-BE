@@ -34,11 +34,19 @@ async def issue_problem_urls(problem : Problem) -> ProblemURLBundle:
     if problem is None:
         raise ValueError("Problem 객체가 없습니다")
 
+    print(f"[DEBUG] issue_problem_urls: {problem.problem_id}, body_key: {problem.body_key}, image_keys: {problem.image_keys}")
     #문제 본문 url
     problem_url = sign_s3_url(problem.body_key, ttl=ENDTIMER)
 
     #이미지 url
     image_urls: list[str] = []
+    if not problem.image_keys:
+        print(f"[DEBUG] 문제 {problem.problem_id}에 이미지가 없습니다.")
+        return {
+            "problem_url": problem_url,
+            "image_urls": image_urls
+        }
+    
     for key in problem.image_keys:                  # TEXT[] 순서를 그대로 유지
         url = sign_s3_url(key, ttl=ENDTIMER)
         image_urls.append(url)
