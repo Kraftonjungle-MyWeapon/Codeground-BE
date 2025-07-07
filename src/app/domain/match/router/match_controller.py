@@ -9,6 +9,7 @@ from src.app.domain.match.utils.queues import enqueue_user, dequeue_user, queue_
 from src.app.domain.match.service import match_service as service
 from src.app.domain.user.service.user_service import get_user_data
 from src.app.models.models import Problem
+from src.app.utils.s3_utils import issue_problem_urls
 from src.app.domain.match.schemas import match_schemas as schemas
 
 router = APIRouter()
@@ -82,22 +83,24 @@ async def handle_accept(match_id: int, user_id: int, db: Session):
     if all(ws_manager.match_state[match_id].values()):
         users = list(ws_manager.match_state[match_id].keys())
 
-        match, problem_id = await service.create_match_with_logs(db, users)
-        problem = db.query(Problem).filter(Problem.problem_id == problem_id).first()
+        match, problem = await service.create_match_with_logs(db, users)
+
 
         # 여기에서 게임방 유저 등록
         for uid in users:
             user_cache.pop(uid, None)
         game_user_map[match.match_id] = users
+
+        presigned = await issue_problem_urls(problem)
+
         msg = {
             "type": "match_accepted",
             "game_id": match.match_id,
             "join_url": f"/game/{match.match_id}",
             "problem": {
                 "problem_id": problem.problem_id,
-                "title": problem.title,
-                "description": problem.problem_prefix,
-                "category": problem.category,
+                "problem_url": presigned["problem_url"],
+                "image_urls" : presigned["image_urls"],
                 "difficulty": problem.difficulty,
             },
         }
@@ -133,8 +136,10 @@ async def match_cancel(user_id: int):
     return {"ok": True}
 
 
-@router.get("/match_logs/{user_id}", response_model=list[schemas.MatchLogSchema])
-async def get_user_match_logs(user_id: int, db: DB):
-    match_logs = await service.get_match_logs_by_user_id(db, user_id)
+@router.get("/match_logs/{user_id}/{count}", response_model=list[schemas.MatchLogSchema])
+async def get_user_match_logs(db: DB, user_id: int, count : int):
+    match_logs = await service.get_match_logs_by_user_id(db, user_id, count)
+    print(match_logs)
+
     return match_logs
 

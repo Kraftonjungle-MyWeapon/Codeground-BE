@@ -42,3 +42,7 @@ def insert_rank_change_log(
 
 async def get_rank_by_id(db: Session, user_id: int) -> type[Ranking] | None:
     return db.query(Ranking).filter(Ranking.user_id == user_id).first()
+
+
+async def get_users_in_mmr_range(db: Session, min_mmr: float, max_mmr: float) -> list[type[Ranking]]:
+    return db.query(Ranking).filter(Ranking.mmr.between(min_mmr, max_mmr)).order_by(Ranking.mmr.desc(),Ranking.rank.asc()).all()

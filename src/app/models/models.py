@@ -68,6 +68,7 @@ class MatchLog(Base):
     result = Column(Enum(MatchResult), nullable=True)
     mmr_earned = Column(Float, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    opponent_id = Column(Integer, nullable=False)
     opponent_mmr = Column(Float, nullable=False)
     opponent_rd = Column(Float, nullable=False)
     is_consumed = Column(Boolean, server_default=text("FALSE"))
@@ -118,6 +119,8 @@ class Problem(Base):
     title = Column(Text, nullable=False)
     category = Column(ARRAY(String), nullable=False)
     difficulty = Column(Enum(ProblemDifficultyByTiers), nullable=True)
+    body_key = Column(Text, nullable=False)
+    image_keys = Column(ARRAY(Text),nullable=True, default=list)
     language = Column(ARRAY(String), nullable=False)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -135,7 +138,7 @@ class Ranking(Base):
 
     ranking_id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
-    mmr = Column(Integer, nullable=False)
+    mmr = Column(Integer, nullable=False,index = True)
     language = Column(String, nullable=False, server_default="python3")
     rank = Column(Integer, nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
