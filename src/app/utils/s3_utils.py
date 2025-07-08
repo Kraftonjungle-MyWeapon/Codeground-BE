@@ -4,8 +4,9 @@ from typing import TypedDict, List
 from src.app.models.models import Problem
 from src.app.config.config import settings
 
-BUCKET = settings.PROBLEM_BUCKET
+PROBLEM_BUCKET = settings.PROBLEM_BUCKET
 REGION = settings.AWS_REGION
+REPORT_BUCKET = settings.REPORT_BUCKET
 
 
 class ProblemURLBundle(TypedDict):
@@ -13,7 +14,7 @@ class ProblemURLBundle(TypedDict):
     image_urls: List[str]  # 0-N개 presigned URL, 순서 유지
 
 
-if not BUCKET or not REGION:
+if not PROBLEM_BUCKET or not REGION:
     raise RuntimeError("환경변수 PROBLEM_BUCKET / AWS_REGION 설정이 필요합니다")
 
 ENDTIMER = 3600  # presigned URL TTL (초)
@@ -26,18 +27,26 @@ def sign_s3_url(key: str, ttl: int) -> str:
     try:
         return s3.generate_presigned_url(
             "get_object",
-            Params={"Bucket": BUCKET, "Key": key},
+            Params={"Bucket": PROBLEM_BUCKET, "Key": key},
             ExpiresIn=ttl,
         )
     except Exception as e:
         raise RuntimeError(f"Presigned URL 생성 실패: {key}, 에러: {e}")
 
 
+def upload_bytes(data: bytes, key: str, bucket: str = REPORT_BUCKET) -> None:
+    try:
+        s3.put_object(Bucket=bucket, Key=key, Body=data)
+    except Exception as e:
+        raise RuntimeError(f"S3 업로드 실패: {key}, 에러: {e}")
+
+
 async def issue_problem_urls(problem: Problem) -> ProblemURLBundle:
     if problem is None:
         raise ValueError("Problem 객체가 없습니다")
 
-    print(f"[DEBUG] issue_problem_urls: problem_id={problem.problem_id}, body_key={problem.body_key}, image_keys={problem.image_keys}")
+    print(
+        f"[DEBUG] issue_problem_urls: problem_id={problem.problem_id}, body_key={problem.body_key}, image_keys={problem.image_keys}")
 
     # 문제 본문 URL 생성
     problem_url = sign_s3_url(problem.body_key, ttl=ENDTIMER)

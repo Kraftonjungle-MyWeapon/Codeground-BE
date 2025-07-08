@@ -20,7 +20,12 @@ async def game_websocket(db: DB, websocket: WebSocket, game_id: int, user_id: in
     game_id = int(game_id)
     user_id = int(user_id)
 
-    await websocket.accept()
+    try:
+        # handshake는 서버가 먼저 accept 하지 않으면 작동하지 않음
+        await websocket.accept()
+    except RuntimeError as e:
+        print(f"[WebSocket] accept() 실패: {e}")
+        return
 
     # 인증: 해당 게임방에 참여할 자격이 있는지 확인
     if game_id not in game_user_map or user_id not in game_user_map[game_id]:
@@ -31,6 +36,7 @@ async def game_websocket(db: DB, websocket: WebSocket, game_id: int, user_id: in
     # 재연결 감지 및 알림
     if disconnected_users.get(game_id) == user_id:
         disconnected_users.pop(game_id, None)
+        print("사용자 재 연결 발생")
         await broadcast_to_room(
             game_id,
             {
@@ -97,6 +103,7 @@ async def handle_game_message(db, websocket: WebSocket, game_id: int, user_id: i
             await broadcast_to_room(game_id, {"type": "chat", "sender": user_id, "message": data.get("message")})
 
         elif message_type == "webrtc_signal":
+            print("webrtc_signal 호출")
             # ICE candidate 혹은 SDP 교환
             await broadcast_to_room(
                 game_id, {"type": "webrtc_signal", "sender": user_id, "signal": data.get("signal")}, exclude=websocket
@@ -105,6 +112,7 @@ async def handle_game_message(db, websocket: WebSocket, game_id: int, user_id: i
         elif message_type == "ready":
             ready_status[game_id][user_id] = True
             await broadcast_to_room(game_id, {"type": "player_ready", "user_id": user_id})
+            print(f"{user_id}번 유저 준비")
             if all(ready_status[game_id].values()):
                 await broadcast_to_room(game_id, {"type": "all_ready"})
 
@@ -130,6 +138,7 @@ async def handle_game_message(db, websocket: WebSocket, game_id: int, user_id: i
             )
 
         elif message_type == "screen_share_started":
+            print("screen_share_started")
             await broadcast_to_room(
                 game_id,
                 {
@@ -137,6 +146,18 @@ async def handle_game_message(db, websocket: WebSocket, game_id: int, user_id: i
                     "user_id": user_id,
                     "message": "상대방이 화면 공유를 시작했습니다.",
                 },
+            )
+
+        elif message_type == "renegotiate_screen_share":
+            # 화면 공유 재협상 요청 → 상대방에게 전달
+            await broadcast_to_room(
+                game_id,
+                {
+                    "type": "renegotiate_screen_share",
+                    "user_id": user_id,
+                    "message": "상대방이 화면 공유 재협상을 요청했습니다.",
+                },
+                exclude=websocket
             )
 
         # 제출 / 시간초과 / 항복 시 여기로

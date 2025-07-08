@@ -1,7 +1,10 @@
 from pathlib import Path
 import uuid
 from sqlalchemy.orm import Session
+from src.app.config.config import settings
+from src.app.utils.s3_utils import upload_bytes
 from fastapi import UploadFile
+from datetime import datetime
 
 from src.app.domain.report.crud import report_crud
 
@@ -18,7 +21,20 @@ async def save_report(
     video: UploadFile
 ) -> None:
     file_name = f"{uuid.uuid4()}.webm"
-    file_path = REPORT_DIR / file_name
-    with open(file_path, "wb") as f:
-        f.write(await video.read())
-    report_crud.create_report(db, game_id, reason, description, str(file_path))
+    env = (getattr(settings, "ENV", None) or getattr(settings, "ENVIRONMENT", None) or "local").lower()
+    file_bytes = await video.read()
+
+    # 오늘 날짜 기준 폴더명 생성 (예: '2025-07-08')
+    today_str = datetime.now().strftime("%Y-%m-%d")
+
+    if env == "local":
+        file_path = REPORT_DIR / file_name
+        with open(file_path, "wb") as f:
+            f.write(file_bytes)
+        video_path = str(file_path)
+    else:
+        s3_key = f"reports/{today_str}/{file_name}"
+        upload_bytes(file_bytes, s3_key, bucket=settings.REPORT_BUCKET)
+        video_path = s3_key
+
+    report_crud.create_report(db, game_id, reason, description, video_path)
