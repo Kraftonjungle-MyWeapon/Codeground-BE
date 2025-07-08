@@ -46,10 +46,10 @@ async def issue_problem_urls(problem : Problem) -> ProblemURLBundle:
             "problem_url": problem_url,
             "image_urls": image_urls
         }
-    
-    for key in problem.image_keys:                  # TEXT[] 순서를 그대로 유지
-        url = sign_s3_url(key, ttl=ENDTIMER)
-        image_urls.append(url)
+
+    # for key in problem.image_keys:                  # TEXT[] 순서를 그대로 유지
+    #     url = sign_s3_url(key, ttl=ENDTIMER)
+    #     image_urls.append(url)
 
     return {
         "problem_url": problem_url,
