@@ -34,11 +34,27 @@ async def join(db: Session, sign_up_request: schemas.SignupRequest) -> schemas.S
 
 
 async def authenticate_user(db: Session, email: str, password: str) -> schemas.LoginUserDto:
-    user = crud.get_user_by_email(db, email)  # ✅ await 제거
-    if not user or not await verify_password(password, user.password):
+    user = crud.get_user_by_email(db, email)
+
+    if not user:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="이메일 또는 비밀번호가 올바르지 않습니다."
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="이메일 또는 비밀번호가 올바르지 않습니다.",
         )
+
+    # ✅ GitHub 로그인 계정이면 비밀번호가 없음
+    if user.github_id and not user.password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="이 이메일은 GitHub 계정으로 가입되었습니다. GitHub 로그인으로 이용해주세요.",
+        )
+
+    if not await verify_password(password, user.password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="이메일 또는 비밀번호가 올바르지 않습니다.",
+        )
+
     return schemas.LoginUserDto.model_validate(user)
 
 

@@ -16,8 +16,8 @@ from src.app.domain.report import router as report_router
 from src.app.config.config import settings
 from src.app.domain.match.service.match_service import match_service
 from src.app.domain.ranking.router.ranking_controller import router as ranking_router
+from src.app.domain.auth.router.github_controller import router as github_router
 from src.app.domain.ranking.service.ranking_scheduler import start_ranking_scheduler
-from starlette.middleware.base import BaseHTTPMiddleware
 
 from src.app.utils.middlewares.domain_limiter import DomainLimiterMiddleware
 
@@ -35,6 +35,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
+
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     print(f"🚨 Validation error on {request.url}: {exc.errors()}")
@@ -43,6 +44,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         status_code=400,
         content={"detail": exc.errors()},
     )
+
 
 # 미들웨어 등록
 app.add_middleware(DomainLimiterMiddleware)
@@ -58,6 +60,7 @@ app.add_middleware(
 )
 
 app.include_router(router=auth_router, prefix=settings.API_V1_STR)
+app.include_router(router=github_router, prefix=settings.API_V1_STR)  # ✅ 명확히 분리
 app.include_router(router=webrtc_router, prefix=settings.API_V1_STR)
 app.include_router(router=match_router, prefix=settings.API_V1_STR)
 app.include_router(router=user_router, prefix=settings.API_V1_STR)
@@ -70,6 +73,7 @@ app.include_router(router=report_router, prefix=settings.API_V1_STR)
 @app.get("/")
 async def health_check():
     return JSONResponse({"status": "ok"})
+
 
 # test
 if __name__ == "__main__":
