@@ -17,12 +17,9 @@ def get_current_user(
         email = decode_token(access_token)
         user = crud.get_user_by_email(db, email=email)
         if user is None:
-            print("[ERROR] 해당 이메일의 유저 없음")
             raise HTTPException(status_code=401, detail="User is None")
         return user
     except JWTError as e:
-        print(f"[ERROR] JWT 디코딩 에러: {e}")
         raise HTTPException(status_code=401, detail="Could not validate credentials")
     except Exception as e:
-        print(f"[ERROR] Exception: {e}")
         raise HTTPException(status_code=500, detail=f"Error: {e}")
