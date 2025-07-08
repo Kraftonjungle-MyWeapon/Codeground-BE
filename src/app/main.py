@@ -72,7 +72,6 @@ app.include_router(router=report_router, prefix=settings.API_V1_STR)
 async def health_check():
     return JSONResponse({"status": "ok"})
 
-print("CORS_ALLOWED_ORIGINS >>>", settings.CORS_ALLOWED_ORIGINS)
 
 # test
 if __name__ == "__main__":
