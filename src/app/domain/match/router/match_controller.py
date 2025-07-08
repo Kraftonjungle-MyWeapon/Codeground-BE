@@ -46,27 +46,6 @@ async def websocket_endpoint(
         await match_cancel(user_id)
 
 
-# async def try_matching():
-#     global match_id_counter
-#     user1, user2 = ws_manager.pop_from_queue()
-#     if not user1 or not user2:
-#         return
-#
-#     match_id = match_id_counter
-#     match_id_counter += 1
-#
-#     ws_manager.match_state[match_id][user1] = False
-#     ws_manager.match_state[match_id][user2] = False
-#
-#     # 선택된 유저 1, 2 에게 매칭이 되었으니 게임을 진행할 것인지 여부를 묻기 위한 메시지 전송
-#     await ws_manager.broadcast(
-#         [user1, user2], {"type": "match_found", "match_id": match_id, "opponent_ids": [user1, user2], "time_limit": 20}
-#     )
-#
-#     # 타이머 처리 (20초 안에 둘 다 수락하지 않으면 매칭 취소)
-#     asyncio.create_task(handle_match_timeout(match_id, [user1, user2], 20))
-
-
 async def handle_accept(match_id: int, user_id: int, db: Session):
     if match_id not in ws_manager.match_state:
         return

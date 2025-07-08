@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     GITHUB_CLIENT_ID: str = os.environ.get("GITHUB_CLIENT_ID", "")
     GITHUB_CLIENT_SECRET: str = os.environ.get("GITHUB_CLIENT_SECRET", "")
     FRONTEND_REDIRECT_URL: str = os.environ.get("FRONTEND_REDIRECT_URL", "http://localhost:8080/oauth/callback")
+    REPORT_BUCKET: str = os.environ.get("REPORT_BUCKET", "")
 
     class Config:
         env_file = ENV_PATH
