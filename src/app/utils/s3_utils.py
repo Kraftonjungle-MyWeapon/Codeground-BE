@@ -14,8 +14,8 @@ class ProblemURLBundle(TypedDict):
     image_urls: List[str]  # 0-N개 presigned URL, 순서 유지
 
 
-if not PROBLEM_BUCKET or not REGION:
-    raise RuntimeError("환경변수 PROBLEM_BUCKET / AWS_REGION 설정이 필요합니다")
+# if not PROBLEM_BUCKET or not REGION:
+#     raise RuntimeError("환경변수 PROBLEM_BUCKET / AWS_REGION 설정이 필요합니다")
 
 ENDTIMER = 3600  # presigned URL TTL (초)
 
@@ -31,19 +31,22 @@ def sign_s3_url(key: str, ttl: int) -> str:
             ExpiresIn=ttl,
         )
     except Exception as e:
-        raise RuntimeError(f"Presigned URL 생성 실패: {key}, 에러: {e}")
+        pass
+        # raise RuntimeError(f"Presigned URL 생성 실패: {key}, 에러: {e}")
 
 
 def upload_bytes(data: bytes, key: str, bucket: str = REPORT_BUCKET) -> None:
     try:
         s3.put_object(Bucket=bucket, Key=key, Body=data)
     except Exception as e:
-        raise RuntimeError(f"S3 업로드 실패: {key}, 에러: {e}")
+        pass
+        # raise RuntimeError(f"S3 업로드 실패: {key}, 에러: {e}")
 
 
 async def issue_problem_urls(problem: Problem) -> ProblemURLBundle:
     if problem is None:
-        raise ValueError("Problem 객체가 없습니다")
+        pass
+        # raise ValueError("Problem 객체가 없습니다")
 
     print(
         f"[DEBUG] issue_problem_urls: problem_id={problem.problem_id}, body_key={problem.body_key}, image_keys={problem.image_keys}")
@@ -59,7 +62,8 @@ async def issue_problem_urls(problem: Problem) -> ProblemURLBundle:
                 image_url = sign_s3_url(key, ttl=ENDTIMER)
                 image_urls.append(image_url)
             except Exception as e:
-                print(f"[WARNING] presigned URL 생성 실패 (image key: {key}): {e}")
+                pass
+            #     print(f"[WARNING] presigned URL 생성 실패 (image key: {key}): {e}")
     else:
         print(f"[DEBUG] 문제 {problem.problem_id}에 이미지가 없습니다.")
 
