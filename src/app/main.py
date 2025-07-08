@@ -27,7 +27,6 @@ STATIC_DIR = BASE_DIR / "resource" / "static"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("matching 시작")
     match_service.start()  # 백그라운드 매칭 루프 시작
     start_ranking_scheduler()  # ⬅️ 여기서 스케줄러 시작
     yield
@@ -71,8 +70,6 @@ app.include_router(router=report_router, prefix=settings.API_V1_STR)
 @app.get("/")
 async def health_check():
     return JSONResponse({"status": "ok"})
-
-print("CORS_ALLOWED_ORIGINS >>>", settings.CORS_ALLOWED_ORIGINS)
 
 # test
 if __name__ == "__main__":
