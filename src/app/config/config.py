@@ -26,8 +26,6 @@ class Settings(BaseSettings):
     ONLINE_JUDGE_HOST_ENDPOINT: str = os.environ.get("ONLINE_JUDGE_HOST_ENDPOINT", "")
     PROBLEM_BUCKET: str = os.environ.get("PROBLEM_BUCKET", "" )
     AWS_REGION: str = os.environ.get("AWS_REGION","" )
-    AWS_ACCESS_KEY_ID: str = os.environ.get("AWS_ACCESS_KEY_ID", "")
-    AWS_SECRET_ACCESS_KEY: str = os.environ.get("AWS_SECRET_ACCESS_KEY", "")
 
     class Config:
         env_file = ENV_PATH
