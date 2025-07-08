@@ -126,7 +126,7 @@ async def handle_match_timeout(match_id: int, users: list[int], timeout: int):
 async def create_match_with_logs(db: Session, user_ids: list[int]) -> tuple[Match, Problem]:
     mmrs = [get_user_mmr(db, uid) for uid in user_ids]
     tiers = [mmr_to_tier(mmr) for mmr in mmrs]
-    problem = await select_problem_for_tiers(db, tiers[0], tiers[1]) # 티어에 맞춰 랜덤 문제 반환
+    problem = await select_problem_for_tiers(db, tiers[0], tiers[1])  # 티어에 맞춰 랜덤 문제 반환
     match = await match_crud.create_match(db, problem.problem_id)
     await match_crud.create_match_logs(db, match.match_id, user_ids, problem.problem_id)
     db.commit()
@@ -138,7 +138,7 @@ async def get_match_logs_by_user_id(db: Session, user_id: int, counts: int):
 
     logs = await match_crud.get_match_log_by_user_index(db, user_id, counts)
     if not logs:
-        return None
+        return []
 
     for log in logs:
         problem_id = log.problem_id
@@ -151,7 +151,15 @@ async def get_match_logs_by_user_id(db: Session, user_id: int, counts: int):
         difficultly = str(game.difficulty.value)
         earned = int(log.mmr_earned)
         title = str(game.title)
-        result = MatchLogSchema( result = result, mmr_earned = earned,opponent_name = opponent_nick ,opponent_tier = opponent_tier, game_difficulty = difficultly, game_time = game_time, game_title=title )
+        result = MatchLogSchema(
+            result=result,
+            mmr_earned=earned,
+            opponent_name=opponent_nick,
+            opponent_tier=opponent_tier,
+            game_difficulty=difficultly,
+            game_time=game_time,
+            game_title=title,
+        )
         logs_return_list.append(result)
     return logs_return_list
 

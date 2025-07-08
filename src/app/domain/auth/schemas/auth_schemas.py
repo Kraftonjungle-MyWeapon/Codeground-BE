@@ -32,3 +32,11 @@ class LoginUserDto(BaseModel):
     nickname: str
 
     model_config = {"from_attributes": True}
+
+
+class SocialSignupRequest(BaseModel):
+    email: EmailStr
+    username: str
+    nickname: str
+    github_id: str
+    profile_img_url: Optional[str] = None

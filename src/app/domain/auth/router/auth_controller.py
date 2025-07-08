@@ -11,18 +11,35 @@ from src.app.domain.auth.service import auth_service as service
 from src.app.core.token import create_access_token
 from src.app.domain.auth.crud import auth_crud as crud
 
-router = APIRouter()
+router = APIRouter(prefix="/auth")
 
 DB = Annotated[Session, Depends(get_db)]
 
 
 def get_cookie_options():
     if settings.ENV == "local":
-        # 개발환경: 크로스도메인 문제 없으므로 lax, secure X
-        return False, "lax", None, False
+        return False, "lax", None, True
     else:
-        # 운영/배포환경: cross-site 인증, https 강제
         return True, "none", ".code-ground.com", True
+
+
+def set_access_token_cookie(response: Response, access_token: str):
+    secure, samesite, domain, http_only = get_cookie_options()
+
+    cookie_params = {
+        "key": "access_token",
+        "value": access_token,
+        "httponly": http_only,
+        "max_age": 60 * 60 * 24,
+        "secure": secure,
+        "samesite": samesite,
+        "path": "/",
+    }
+
+    if domain:
+        cookie_params["domain"] = domain
+
+    response.set_cookie(**cookie_params)
 
 
 @router.post("/sign-up")
@@ -34,19 +51,7 @@ async def sign_up(sign_up_request: schemas.SignupRequest, db: DB, response: Resp
         db.commit()
 
         access_token = create_access_token(subject=str(sign_up_request.email))
-
-        # 환경에 따라 쿠키 옵션 분기 (가독성 및 실수 방지)
-        secure, samesite, domain, http_only = get_cookie_options()
-        response.set_cookie(
-            key="access_token",
-            value=access_token,
-            httponly=http_only,
-            max_age=60 * 60 * 24,
-            secure=secure,
-            samesite=samesite,
-            path="/",
-            domain=domain,
-        )
+        set_access_token_cookie(response, access_token)
 
         return schemas.TokenResponse(access_token=access_token, token_type="bearer")
 
@@ -61,26 +66,14 @@ async def sign_up(sign_up_request: schemas.SignupRequest, db: DB, response: Resp
 
 @router.post("/login")
 async def login(
-        db: DB,
-        response: Response,
-        form_data: OAuth2PasswordRequestForm = Depends(),
+    db: DB,
+    response: Response,
+    form_data: OAuth2PasswordRequestForm = Depends(),
 ):
     try:
         user = await service.authenticate_user(db, form_data.username, form_data.password)
         access_token = create_access_token(subject=user.email)
-
-        # 환경에 따라 쿠키 옵션 분기 (가독성 및 실수 방지)
-        secure, samesite, domain, http_only = get_cookie_options()
-        response.set_cookie(
-            key="access_token",
-            value=access_token,
-            httponly=http_only,
-            max_age=60 * 60 * 24,
-            secure=secure,
-            samesite=samesite,
-            path="/",
-            domain=domain,
-        )
+        set_access_token_cookie(response, access_token)
 
         return {"access_token": access_token, "token_type": "bearer"}
 
