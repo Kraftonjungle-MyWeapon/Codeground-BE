@@ -21,5 +21,4 @@ def get_user_win_rate(db: Session, user_id: int) -> WinRateResponse:
 
     total_games = win + loss + draw
     win_rate = (win / total_games) * 100 if total_games > 0 else 0
-    print(win, loss, draw, win_rate)
     return WinRateResponse(win=win, loss=loss, draw=draw, win_rate=win_rate)

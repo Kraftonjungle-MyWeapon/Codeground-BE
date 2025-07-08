@@ -26,8 +26,6 @@ class Settings(BaseSettings):
     ONLINE_JUDGE_HOST_ENDPOINT: str = os.environ.get("ONLINE_JUDGE_HOST_ENDPOINT", "")
     PROBLEM_BUCKET: str = os.environ.get("PROBLEM_BUCKET", "")
     AWS_REGION: str = os.environ.get("AWS_REGION", "")
-    AWS_ACCESS_KEY_ID: str = os.environ.get("AWS_ACCESS_KEY_ID", "")
-    AWS_SECRET_ACCESS_KEY: str = os.environ.get("AWS_SECRET_ACCESS_KEY", "")
     GITHUB_CLIENT_ID: str = os.environ.get("GITHUB_CLIENT_ID", "")
     GITHUB_CLIENT_SECRET: str = os.environ.get("GITHUB_CLIENT_SECRET", "")
     FRONTEND_REDIRECT_URL: str = os.environ.get("FRONTEND_REDIRECT_URL", "http://localhost:8080/oauth/callback")
