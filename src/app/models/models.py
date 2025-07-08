@@ -15,7 +15,8 @@ class User(Base):
 
     user_id = Column(Integer, primary_key=True, autoincrement=True)
     email = Column(String(255), unique=True, nullable=False)
-    password = Column(String(255), nullable=False)
+    password = Column(String(255), nullable=True)
+    github_id = Column(String(255), unique=True, nullable=True)
     use_lang = Column(String(50), nullable=False, server_default="python3")  # 사용언어
     username = Column(String(255), nullable=False)
     nickname = Column(String(255), unique=True, nullable=False)
@@ -120,7 +121,7 @@ class Problem(Base):
     category = Column(ARRAY(String), nullable=False)
     difficulty = Column(Enum(ProblemDifficultyByTiers), nullable=True)
     body_key = Column(Text, nullable=False)
-    image_keys = Column(ARRAY(Text),nullable=True, default=list)
+    image_keys = Column(ARRAY(Text), nullable=True, default=list)
     language = Column(ARRAY(String), nullable=False)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -138,7 +139,7 @@ class Ranking(Base):
 
     ranking_id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
-    mmr = Column(Integer, nullable=False,index = True)
+    mmr = Column(Integer, nullable=False, index=True)
     language = Column(String, nullable=False, server_default="python3")
     rank = Column(Integer, nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

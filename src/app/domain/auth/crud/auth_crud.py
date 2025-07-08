@@ -34,3 +34,27 @@ def join_user(db: Session, sign_up_request: schemas.SignupRequest, mmr: int, use
     db.add(mmr_row)
 
     return new_user
+
+
+def get_user_by_github_id(db: Session, github_id: str) -> Optional[User]:
+    return db.query(User).filter(User.github_id == github_id).first()
+
+
+def create_social_user(db: Session, user_data: schemas.SocialSignupRequest) -> User:
+    new_user = User(
+        email=str(user_data.email),
+        username=user_data.username,
+        nickname=user_data.nickname,
+        role=UserRole.USER,
+        github_id=user_data.github_id,
+        profile_img_url=user_data.profile_img_url,
+    )
+    db.add(new_user)
+    db.flush()
+
+    mmr_row = UserMmr(user_id=new_user.user_id, rating=1000)
+    db.add(mmr_row)
+    db.commit()
+    db.refresh(new_user)
+
+    return new_user

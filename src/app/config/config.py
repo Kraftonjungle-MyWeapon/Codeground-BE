@@ -24,8 +24,13 @@ class Settings(BaseSettings):
     DB_PASSWORD: str = os.environ.get("DB_PASSWORD", "")
     DB_NAME: str = os.environ.get("DB_NAME", "")
     ONLINE_JUDGE_HOST_ENDPOINT: str = os.environ.get("ONLINE_JUDGE_HOST_ENDPOINT", "")
-    PROBLEM_BUCKET: str = os.environ.get("PROBLEM_BUCKET", "" )
-    AWS_REGION: str = os.environ.get("AWS_REGION","" )
+    PROBLEM_BUCKET: str = os.environ.get("PROBLEM_BUCKET", "")
+    AWS_REGION: str = os.environ.get("AWS_REGION", "")
+    AWS_ACCESS_KEY_ID: str = os.environ.get("AWS_ACCESS_KEY_ID", "")
+    AWS_SECRET_ACCESS_KEY: str = os.environ.get("AWS_SECRET_ACCESS_KEY", "")
+    GITHUB_CLIENT_ID: str = os.environ.get("GITHUB_CLIENT_ID", "")
+    GITHUB_CLIENT_SECRET: str = os.environ.get("GITHUB_CLIENT_SECRET", "")
+    FRONTEND_REDIRECT_URL: str = os.environ.get("FRONTEND_REDIRECT_URL", "http://localhost:8080/oauth/callback")
 
     class Config:
         env_file = ENV_PATH
@@ -46,5 +51,6 @@ class Settings(BaseSettings):
             # 운영/배포환경: 환경변수에서 반드시 허용할 도메인만 리스트로 반환
             raw = os.environ.get("CORS_ALLOWED_ORIGINS", "https://code-ground.com")
             return [o.strip() for o in raw.split(",") if o.strip()]
+
 
 settings = Settings()
