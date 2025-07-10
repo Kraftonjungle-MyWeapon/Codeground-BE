@@ -1,8 +1,9 @@
 from fastapi import Depends, WebSocket, WebSocketDisconnect, APIRouter, Query
+from src.app.domain.match.crud.match_crud import get_log_by_game_id
 from src.app.utils.game_session import game_rooms, game_user_map, ready_status, disconnected_users
 import json
 import asyncio
-from src.app.domain.game.service.game_result_service import update_user_log, update_match, search_result, get_mmr_earned
+from src.app.domain.game.service.game_result_service import update_user_log, update_match, get_mmr_earned
 from typing import Annotated
 from sqlalchemy.orm import Session
 from src.app.core.database import get_db
@@ -164,17 +165,7 @@ async def handle_game_message(db, websocket: WebSocket, game_id: int, user_id: i
         # 각 reason 은 "finish" / "timeout" / "surrender"
         elif message_type == "match_result":
             reason = data.get("reason")
-            print("시작")
-            winner_id, reason = await process_match_result(db, game_id, user_id, opponent_id, reason)
-            mmr_earned = await get_mmr_earned(db, game_id, user_id)
-            print(winner_id, reason, mmr_earned)
-
-            await broadcast_to_room(game_id, {
-                "type": "match_result",
-                "winner": winner_id,
-                "earned": mmr_earned,
-                "reason": reason
-            })
+            await process_match_result(db, game_id, user_id, opponent_id, reason)
 
         else:
             print("에러 1")
@@ -205,45 +196,47 @@ async def broadcast_to_room(game_id: int, message: dict, exclude: WebSocket = No
             game_rooms[game_id].remove(ws)
 
 
-async def process_match_result(
-        db: Session, game_id: int, user_id: int, opponent_id: int, reason: str
-) -> (int | None, str):
-    opponent_result = await search_result(db, game_id, opponent_id)
+async def process_match_result(db: Session, game_id: int, user_id: int, opponent_id: int, reason: str) -> None:
+
+    # 동시 적용 시
+    user_log = await get_log_by_game_id(db, game_id, user_id)
+    if user_log.result:
+        return None
+
     # 기권 시
     if reason in ("surrender", "abandon"):
-        await update_user_log(db, game_id, user_id, "loss")
-        if opponent_result and opponent_result == "loss":
-            await update_match(db, game_id, "abnormal")
-        # 패배
-        return opponent_id, "surrender"
+        await update_match(db, game_id, "normal")
+        await update_user_log(db, game_id, user_id, opponent_id, opponent_id)
+
+        winner_id, reason = opponent_id, "surrender"
     # 시간 초과 시
     elif reason == "timeout":
-        # 상대방 상태 판단
-        if opponent_result == "loss":
-            await update_user_log(db, game_id, user_id, "win")
-            await update_match(db, game_id, "abnormal")
-            # 상대 기권 시 부전승
-            return user_id, "walkover"
+        await update_match(db, game_id, "draw")
+        await update_user_log(db, game_id, user_id, opponent_id, None)
+        winner_id, reason = None, "draw"
 
-        elif opponent_result == "win":
-            await update_user_log(db, game_id, user_id, "loss")
-            # 상대가 이미 제출 완료 시 패배
-            return opponent_id, "late"
-
-        else:
-            # 상대 또한 timeout 일 시, 무승부
-            await update_user_log(db, game_id, user_id, "draw")
-            await update_match(db, game_id, "draw")
-            return None, "draw"
-
+    # 승리 시
     else:
-        if opponent_result == "win":
-            await update_user_log(db, game_id, user_id, "loss")
-            return opponent_id, "late"
-        else:
-            await update_user_log(db, game_id, user_id, "win")
-            await update_match(db, game_id, "normal")
-            return user_id, "finish"
+        await update_match(db, game_id, "normal")
+        await update_user_log(db, game_id, user_id, opponent_id, user_id)
+        winner_id, reason = user_id, "finish"
+
+    return await broadcast_result(db, game_id, user_id, opponent_id, winner_id, reason)
+
+
+async def broadcast_result(db : Session, game_id: int, user_id: int, opponent_id: int, winner_id : int | None, reason: str | None) -> None:
+    if reason:
+        user_earned = await get_mmr_earned(db, game_id, user_id)
+        opponent_earned = await get_mmr_earned(db, game_id, opponent_id)
+        await broadcast_to_room(game_id, {
+            "type": "match_result",
+            "winner": winner_id,
+            "plus_mmr": max(user_earned, opponent_earned),
+            "minus_mmr": min(user_earned, opponent_earned),
+            "reason": reason
+        })
+    else:
+        return
 
 
 #로컬용

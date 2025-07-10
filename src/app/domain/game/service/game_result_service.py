@@ -1,7 +1,7 @@
 from src.app.domain.match.utils.mmr_measure import full_update, MatchScore
 from src.app.models.models import MatchResult, MatchFinishStatus, MatchStatus
-from src.app.domain.match.crud.match_crud import get_log_by_id, get_mmr_by_id, get_log_by_game_id
-from src.app.domain.ranking.crud.ranking_crud import get_rank_by_id, get_users_in_mmr_range
+from src.app.domain.match.crud.match_crud import get_mmr_by_id, get_log_by_game_id
+from src.app.domain.ranking.crud.ranking_crud import get_rank_by_id
 from src.app.domain.ranking.service.ranking_service import create_rank
 from sqlalchemy.orm import Session
 from src.app.models.models import Match
@@ -83,26 +83,30 @@ async def update_user_mmr(db: Session, game_id: int, user_id: int) -> None:
     return
 
 
-async def update_user_log(db: Session, game_id: int, user_id: int, result: str) -> None:
+async def update_user_log(db: Session, game_id: int, user_id: int, opponent_id : int, winner_id: int | None) -> None:
     # MatchLog 가져오기
     user_log = await get_log_by_game_id(db, game_id, user_id)
-
+    opponent_log = await get_log_by_game_id(db, game_id, opponent_id)
     # 결과 기록
-    if result == "win":
-        user_log.result = MatchResult.WIN
-
-    elif result == "loss":
-        user_log.result = MatchResult.LOSS
-
-    elif result == "draw":
+    if not winner_id:
         user_log.result = MatchResult.DRAW
+        opponent_log.result = MatchResult.DRAW
+
+    elif winner_id == user_id:
+        user_log.result = MatchResult.WIN
+        opponent_log.result = MatchResult.LOSS
 
     else:
-        raise ValueError(f"Invalid result '{result}' passed to update_user_log.")
+        user_log.result = MatchResult.LOSS
+        opponent_log.result = MatchResult.WIN
+
     db.commit()
     db.refresh(user_log)
+    db.refresh(opponent_log)
 
-    return await update_user_mmr(db, game_id, user_id)
+    await update_user_mmr(db, game_id, user_id)
+    await update_user_mmr(db, game_id, opponent_id)
+    return
 
 
 async def update_match(db: Session, match_id: int, reason: str) -> None:
