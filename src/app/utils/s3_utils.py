@@ -39,8 +39,7 @@ def upload_bytes(data: bytes, key: str, bucket: str = REPORT_BUCKET) -> None:
     try:
         s3.put_object(Bucket=bucket, Key=key, Body=data)
     except Exception as e:
-        pass
-        # raise RuntimeError(f"S3 업로드 실패: {key}, 에러: {e}")
+        raise RuntimeError(f"S3 업로드 실패: {key}, 에러: {e}")
 
 
 async def issue_problem_urls(problem: Problem) -> ProblemURLBundle:

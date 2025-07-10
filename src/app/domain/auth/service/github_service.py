@@ -10,8 +10,7 @@ from urllib.parse import urlencode
 
 
 def get_github_auth_url() -> str:
-    redirect_uri = "http://localhost:8000/api/v1/auth/github/callback"  # ✅ 백엔드 콜백 주소
-    print("🔑 GitHub Client ID:", settings.GITHUB_CLIENT_ID)  # ✅ 여기 추가
+    redirect_uri = "http://localhost:8000/api/v1/auth/github/callback"
     return (
         "https://github.com/login/oauth/authorize"
         f"?client_id={settings.GITHUB_CLIENT_ID}"
