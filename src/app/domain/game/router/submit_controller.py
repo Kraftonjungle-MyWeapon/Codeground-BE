@@ -18,6 +18,7 @@ async def submit_code(request: schemas.SubmitRequest, db: Session = Depends(get_
     AppStatus.should_exit_event = None # 여기서 AppStatus는, EventSourceResponse와 관련된 이벤트 스트리밍 처리에서, 서버 상태나 종료 신호(should_exit_event 등)를 관리하는 데 쓰임.
     # 코드에서 위 값(should_exit_event)을 명시적으로 None으로 리셋하는 이유는, 이전에 남아있던 종료 플래그를 초기화함으로써 새로운 SSE 세션에 영향이 없도록 하기 위함임.
     event_generator = service.stream_evaluate_code(db, current_user.user_id, request.match_id, request.language, request.code, request.problem_id)
+    print(event_generator)
     return EventSourceResponse(event_generator)
 
 @router.post("/submit_public")

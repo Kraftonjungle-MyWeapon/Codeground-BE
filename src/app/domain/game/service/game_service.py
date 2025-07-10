@@ -4,7 +4,8 @@ import json
 from fastapi import HTTPException
 from src.app.config.config import settings
 from sqlalchemy.orm import Session
-from src.app.domain.game.service import game_result_service
+from src.app.domain.game.router.game_controller import process_match_result
+from src.app.domain.match.crud.match_crud import get_log_by_game_id
 
 
 async def evaluate_code(language: str, code: str):
@@ -67,10 +68,11 @@ async def stream_evaluate_code(db: Session, user_id: int, match_id: int, languag
                 # Parse the final message to extract the result
                 final_message = json.loads(message)
                 # Assuming 'result' is present in the final message from the judge service
-                result = final_message.get("result")
-
-                if result:
-                    await game_result_service.update_user_log(db, match_id, user_id, result)
+                result = final_message.get("status")
+                if result == "success":
+                    log = await get_log_by_game_id(db, match_id, user_id)
+                    opponent_id = log.opponent_id
+                    await process_match_result(db, match_id, user_id, opponent_id, "finish")
                 break
 
 async def stream_evaluate_code_public(language: str, code: str, problem_id: str):
