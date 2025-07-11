@@ -91,6 +91,8 @@ async def set_body(request: Request, body: bytes):
 
 
 async def log_requests(request: Request, call_next):
+    if request.headers.get("accept") == "text/event-stream":
+        return await call_next(request)
     if request.url.path.endswith("/") or request.url.path.endswith("/openapi.json"):
         response = await call_next(request)
         return response
