@@ -8,6 +8,7 @@ from typing import Annotated
 from sqlalchemy.orm import Session
 from src.app.core.database import get_db
 from pathlib import Path
+from src.app.utils.logging import logger
 
 router = APIRouter()
 DB = Annotated[Session, Depends(get_db)]
@@ -20,6 +21,7 @@ RECONNECT_TIMEOUT = 5
 async def game_websocket(db: DB, websocket: WebSocket, game_id: int, user_id: int = Query(...)):
     game_id = int(game_id)
     user_id = int(user_id)
+    logger.info(f"User {user_id} attempting to connect to game {game_id}")
 
     try:
         # handshake는 서버가 먼저 accept 하지 않으면 작동하지 않음
@@ -30,6 +32,7 @@ async def game_websocket(db: DB, websocket: WebSocket, game_id: int, user_id: in
 
     # 인증: 해당 게임방에 참여할 자격이 있는지 확인
     if game_id not in game_user_map or user_id not in game_user_map[game_id]:
+        logger.warning(f"Unauthorized connection attempt by user {user_id} to game {game_id}")
         await websocket.accept()  # 반드시 먼저 accept
         await websocket.close(code=4001)
         return
@@ -37,7 +40,7 @@ async def game_websocket(db: DB, websocket: WebSocket, game_id: int, user_id: in
     # 재연결 감지 및 알림
     if disconnected_users.get(game_id) == user_id:
         disconnected_users.pop(game_id, None)
-        print("사용자 재 연결 발생")
+        logger.info(f"User {user_id} reconnected to game {game_id}")
         await broadcast_to_room(
             game_id,
             {
@@ -50,15 +53,17 @@ async def game_websocket(db: DB, websocket: WebSocket, game_id: int, user_id: in
         )
     game_rooms[game_id].append(websocket)
     ready_status[game_id][user_id] = False
+    logger.info(f"User {user_id} connected to game {game_id}")
 
     try:
         while True:
             # 클라이언트에서 받은 메시지를 처리 핸들러로 전달
             message = await websocket.receive_text()
-
+            logger.debug(f"Received message from user {user_id} in game {game_id}: {message}")
             await handle_game_message(db, websocket, game_id, user_id, message)
 
     except WebSocketDisconnect:
+        logger.info(f"User {user_id} disconnected from game {game_id}")
         # 연결 종료 시 정리
         if websocket in game_rooms[game_id]:
             game_rooms[game_id].remove(websocket)
@@ -73,6 +78,7 @@ async def game_websocket(db: DB, websocket: WebSocket, game_id: int, user_id: in
             await asyncio.sleep(RECONNECT_TIMEOUT)
             # 아직 재접속되지 않았다면 ‘완전 이탈’ 처리
             if disconnected_users.get(game_id) == user_id:
+                logger.info(f"User {user_id} permanently left game {game_id}")
                 # 상대방에게 이탈 알림
                 if game_rooms.get(game_id):
                     await broadcast_to_room(
@@ -85,6 +91,7 @@ async def game_websocket(db: DB, websocket: WebSocket, game_id: int, user_id: in
                     )
                 # 방 정리
                 if not game_rooms.get(game_id):
+                    logger.info(f"Closing game room {game_id}")
                     game_rooms.pop(game_id, None)
                     ready_status.pop(game_id, None)
                     disconnected_users.pop(game_id, None)
@@ -98,13 +105,14 @@ async def handle_game_message(db, websocket: WebSocket, game_id: int, user_id: i
     try:
         data = json.loads(message)
         message_type = data.get("type")
+        logger.info(f"Handling message type '{message_type}' for user {user_id} in game {game_id}")
 
         if message_type == "chat":
             # 채팅 메시지 전체 브로드캐스트
             await broadcast_to_room(game_id, {"type": "chat", "sender": user_id, "message": data.get("message")})
 
         elif message_type == "webrtc_signal":
-            print("webrtc_signal 호출")
+            logger.debug(f"Broadcasting WebRTC signal from {user_id} in game {game_id}")
             # ICE candidate 혹은 SDP 교환
             await broadcast_to_room(
                 game_id, {"type": "webrtc_signal", "sender": user_id, "signal": data.get("signal")}, exclude=websocket
@@ -113,8 +121,9 @@ async def handle_game_message(db, websocket: WebSocket, game_id: int, user_id: i
         elif message_type == "ready":
             ready_status[game_id][user_id] = True
             await broadcast_to_room(game_id, {"type": "player_ready", "user_id": user_id})
-            print(f"{user_id}번 유저 준비")
+            logger.info(f"User {user_id} is ready in game {game_id}")
             if all(ready_status[game_id].values()):
+                logger.info(f"All players are ready in game {game_id}")
                 await broadcast_to_room(game_id, {"type": "all_ready"})
 
         elif message_type == "system_warning":
@@ -127,7 +136,7 @@ async def handle_game_message(db, websocket: WebSocket, game_id: int, user_id: i
             })
 
         elif message_type == "screen_share_stopped":
-            print("screen_share_stopped")
+            logger.info(f"Screen share stopped by user {user_id} in game {game_id}")
             # 상대방에게 화면 공유 중단 알림 전송
             await broadcast_to_room(
                 game_id,
@@ -139,7 +148,7 @@ async def handle_game_message(db, websocket: WebSocket, game_id: int, user_id: i
             )
 
         elif message_type == "screen_share_started":
-            print("screen_share_started")
+            logger.info(f"Screen share started by user {user_id} in game {game_id}")
             await broadcast_to_room(
                 game_id,
                 {
@@ -168,11 +177,11 @@ async def handle_game_message(db, websocket: WebSocket, game_id: int, user_id: i
             await process_match_result(db, game_id, user_id, opponent_id, reason)
 
         else:
-            print("에러 1")
+            logger.warning(f"Unknown message type received in game {game_id}: {message_type}")
             await websocket.send_json({"type": "error", "message": "Unknown message type"})
 
     except Exception as e:
-        print("에러 2")
+        logger.error(f"Error handling message in game {game_id}: {e}")
         await websocket.send_json({"type": "error", "message": str(e)})
 
 
@@ -188,7 +197,7 @@ async def broadcast_to_room(game_id: int, message: dict, exclude: WebSocket = No
         except WebSocketDisconnect:
             disconnected_sockets.append(ws)
         except Exception as e:
-            print(f"[broadcast_to_room] 전송 중 예외 발생: {e}")
+            logger.error(f"[broadcast_to_room] Exception while sending to a websocket in game {game_id}: {e}")
             disconnected_sockets.append(ws)
 
     for ws in disconnected_sockets:
@@ -249,6 +258,6 @@ DATA_DIR = ROOT_DIR / "data"
 
 @router.get("/for_local")
 async def get_for_local():
-    json_path = DATA_DIR / "prob-bronze.json"    # C:\\…\\Codeground-Backend\\data\\prob-bronze.json
+    json_path = DATA_DIR / "prob-bronze.json"    # C:\…\Codeground-Backend\data\prob-bronze.json
     with json_path.open(encoding="utf-8") as f:
         return json.load(f)

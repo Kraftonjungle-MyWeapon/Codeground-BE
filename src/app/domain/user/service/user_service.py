@@ -3,12 +3,16 @@ from sqlalchemy.orm import Session
 from src.app.domain.user.crud import user_crud as crud
 from src.app.domain.user.schemas import user_schemas as schemas
 from src.app.core.password import get_password_hash, verify_password as verify_pw
+from src.app.utils.logging import logger
 
 
 async def get_user_data(db: Session, input_id: int) -> schemas.UserDto:
+    logger.info(f"Attempting to retrieve user data for ID: {input_id}")
     user = crud.get_user_by_id(db, input_id=input_id)
     if not user:
+        logger.warning(f"User with ID {input_id} not found.")
         raise HTTPException(status_code=404, detail="User not found")
+    logger.info(f"Successfully retrieved user data for ID: {input_id}")
     return schemas.UserDto.model_validate(user)
 
 
@@ -20,29 +24,37 @@ async def update_my_profile(
     new_password: str | None,
     profile_img_url: str | None = None,
 ):
+    logger.info(f"Attempting to update profile for user ID: {user_id}")
     user = crud.get_user_by_id(db, user_id)
 
     if not user:
+        logger.warning(f"User with ID {user_id} not found for profile update.")
         raise HTTPException(status_code=404, detail="User not found")
 
     if new_password:
         if not current_password:
+            logger.warning(f"Current password not provided for user {user_id} during password change.")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="현재 비밀번호를 입력해야 합니다.",
             )
         if not await verify_pw(current_password, user.password):
+            logger.warning(f"Incorrect current password for user {user_id} during password change.")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="현재 비밀번호가 일치하지 않습니다.",
             )
         user.password = get_password_hash(new_password)
+        logger.info(f"Password updated for user ID: {user_id}")
 
     if nickname:
         user.nickname = nickname
+        logger.info(f"Nickname updated for user ID: {user_id}")
 
     if profile_img_url:
         user.profile_img_url = profile_img_url
+        logger.info(f"Profile image URL updated for user ID: {user_id}")
 
     crud.update_user(db, user)
+    logger.info(f"Profile update complete for user ID: {user_id}")
     return user

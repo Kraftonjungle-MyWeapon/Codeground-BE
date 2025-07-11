@@ -10,6 +10,7 @@ from src.app.domain.auth.schemas import auth_schemas as schemas
 from src.app.domain.auth.service import auth_service as service
 from src.app.core.token import create_access_token
 from src.app.domain.auth.crud import auth_crud as crud
+from src.app.utils.logging import logger
 
 router = APIRouter(prefix="/auth")
 
@@ -46,6 +47,7 @@ def set_access_token_cookie(response: Response, access_token: str):
 
 @router.post("/sign-up")
 async def sign_up(sign_up_request: schemas.SignupRequest, db: DB, response: Response):
+    logger.info(f"Signing up user: {sign_up_request.email}")
     try:
         await service.check_duplicate_email(db, str(sign_up_request.email))
         await service.check_duplicate_nickname(db, sign_up_request.nickname)
@@ -66,14 +68,14 @@ async def sign_up(sign_up_request: schemas.SignupRequest, db: DB, response: Resp
             path="/",
             domain=domain,
         )
-
+        logger.info(f"User {sign_up_request.email} signed up successfully")
         return schemas.TokenResponse(access_token=access_token, token_type="bearer")
 
     except HTTPException:
         db.rollback()
         raise
     except Exception as e:
-        print("회원가입 중 에러 발생:", e)
+        logger.error(f"Error during sign-up for {sign_up_request.email}: {e}")
         traceback.print_exc()
         raise
 
@@ -84,6 +86,7 @@ async def login(
     response: Response,
     form_data: OAuth2PasswordRequestForm = Depends(),
 ):
+    logger.info(f"Logging in user: {form_data.username}")
     try:
         user = await service.authenticate_user(db, form_data.username, form_data.password)
         access_token = create_access_token(subject=user.email)
@@ -100,36 +103,41 @@ async def login(
             path="/",
             domain=domain,
         )
-
+        logger.info(f"User {form_data.username} logged in successfully")
         return {"access_token": access_token, "token_type": "bearer"}
 
     except HTTPException as e:
+        logger.warning(f"Failed login attempt for {form_data.username}: {e.detail}")
         raise e
     except Exception as e:
-        print("로그인 에러:", repr(e))
+        logger.error(f"Login error for {form_data.username}: {repr(e)}")
         raise HTTPException(status_code=500, detail="서버 오류로 로그인에 실패했습니다.")
 
 
 @router.post("/reset-password/request")
 async def request_password_reset(email: str, db: DB):
+    logger.info(f"Password reset requested for {email}")
     await service.send_reset_password_email(db, email)
     return {"message": "비밀번호 초기화 메일을 발송했습니다."}
 
 
 @router.post("/reset-password/verify")
 async def verify_reset_code(email: str, code: str, db: DB):
+    logger.info(f"Verifying password reset code for {email}")
     await service.verify_reset_code(db, email, code)
     return {"message": "인증 성공"}
 
 
 @router.post("/reset-password/complete")
 async def complete_password_reset(email: str, code: str, new_password: str, db: DB):
+    logger.info(f"Completing password reset for {email}")
     await service.reset_password(db, email, code, new_password)
     return {"message": "비밀번호가 성공적으로 변경되었습니다."}
 
 
 @router.get("/find-id")
 async def find_id(email: str, db: DB):
+    logger.info(f"Finding ID for email: {email}")
     user = crud.get_user_by_email(db, email)
     if not user:
         raise HTTPException(status_code=404, detail="등록되지 않은 이메일입니다.")
@@ -138,11 +146,13 @@ async def find_id(email: str, db: DB):
 
 @router.get("/check-email")
 async def check_email(email: str, db: DB):
+    logger.info(f"Checking email availability: {email}")
     await service.check_duplicate_email(db, email)
     return {"available": True}
 
 
 @router.get("/check-nickname")
 async def check_nickname(nickname: str, db: DB):
+    logger.info(f"Checking nickname availability: {nickname}")
     await service.check_duplicate_nickname(db, nickname)
     return {"available": True}

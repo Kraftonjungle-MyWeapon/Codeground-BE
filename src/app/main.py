@@ -1,4 +1,7 @@
 import uvicorn
+import src.app.utils.middlewares.logging_middleware as logging_middleware
+
+from src.app.utils.logging import logger
 from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
@@ -21,16 +24,22 @@ from src.app.domain.ranking.service.ranking_scheduler import start_ranking_sched
 
 from src.app.utils.middlewares.domain_limiter import DomainLimiterMiddleware
 
+logger = logger
 BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = BASE_DIR / "resource" / "static"
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    logger.info("--- Server starting up ---")
     match_service.start()  # 백그라운드 매칭 루프 시작
+    logger.info("--- Match service started ---")
     start_ranking_scheduler()  # ⬅️ 여기서 스케줄러 시작
+    logger.info("--- Ranking scheduler started ---")
     yield
+    logger.info("--- Server shutting down ---")
     await match_service.stop()  # 서버 종료 시 안전하게 취소
+    logger.info("--- Match service stopped ---")
 
 
 app = FastAPI(lifespan=lifespan)
@@ -38,8 +47,9 @@ app = FastAPI(lifespan=lifespan)
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    print(f"🚨 Validation error on {request.url}: {exc.errors()}")
-    print(f"🚨 Body: {await request.body()}")
+    body = await request.body()
+    logger.error(f"Validation error on {request.url}: {exc.errors()}")
+    logger.error(f"Body: {body.decode('utf-8') if body else ''}")
     return JSONResponse(
         status_code=400,
         content={"detail": exc.errors()},
@@ -48,7 +58,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 # 미들웨어 등록
 app.add_middleware(DomainLimiterMiddleware)
-
+app.middleware("http")(logging_middleware.log_requests)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 app.add_middleware(

@@ -11,6 +11,7 @@ from src.app.domain.user.service.user_service import get_user_data
 from src.app.models.models import Problem
 from src.app.utils.s3_utils import issue_problem_urls
 from src.app.domain.match.schemas import match_schemas as schemas
+from src.app.utils.logging import logger
 
 router = APIRouter()
 DB = Annotated[Session, Depends(get_db)]
@@ -23,17 +24,20 @@ async def websocket_endpoint(
     db: DB,
 ):
     user_id = int(user_id)
+    logger.info(f"User {user_id} attempting to connect to match websocket.")
     current_user = await get_user_data(db, user_id)
     # ── 2) 매칭 큐 등록 ────────────────────
-    await enqueue_user(db, current_user)  # 반드시 await
+    await enqueue_user(db, current_user)
+    logger.info(f"User {user_id} enqueued for matching.")
 
     # ── 3) 웹소켓 등록 ─────────────────────
     await ws_manager.connect(user_id, websocket)
+    logger.info(f"User {user_id} connected to match websocket.")
 
     try:
-
         while True:
             data = await websocket.receive_json()
+            logger.debug(f"Received message from user {user_id}: {data}")
             if data["type"] == "match_accept":
                 await handle_accept(data["match_id"], user_id, db)
             elif data["type"] == "match_reject":
@@ -41,13 +45,20 @@ async def websocket_endpoint(
             elif data["type"] == "cancel_queue":
                 await match_cancel(user_id)  # ← 큐에서 제거
                 await websocket.send_json({"type": "queue_cancelled"})
+                logger.info(f"User {user_id} cancelled matching queue.")
     except WebSocketDisconnect:
+        logger.info(f"User {user_id} disconnected from match websocket.")
         ws_manager.disconnect(user_id)
         await match_cancel(user_id)
+    except Exception as e:
+        logger.error(f"Error in match websocket for user {user_id}: {e}")
+        await websocket.close(code=1011)
 
 
 async def handle_accept(match_id: int, user_id: int, db: Session):
+    logger.info(f"User {user_id} accepted match {match_id}.")
     if match_id not in ws_manager.match_state:
+        logger.warning(f"Match {match_id} not found for acceptance by user {user_id}.")
         return
 
     ws_manager.match_state[match_id][user_id] = True
@@ -58,9 +69,11 @@ async def handle_accept(match_id: int, user_id: int, db: Session):
             other_users,
             {"type": "opponent_accepted", "user_id": user_id, "match_id": match_id},
         )
+        logger.info(f"Notified opponent(s) of user {user_id} accepting match {match_id}.")
 
     if all(ws_manager.match_state[match_id].values()):
         users = list(ws_manager.match_state[match_id].keys())
+        logger.info(f"All users accepted match {match_id}. Creating match and problem.")
 
         match, problem = await service.create_match_with_logs(db, users)
 
@@ -70,7 +83,7 @@ async def handle_accept(match_id: int, user_id: int, db: Session):
             user_cache.pop(uid, None)
         game_user_map[match.match_id] = users
 
-        print(f"[DEBUG] match_id: {match.match_id}, users: {users}, problem: {problem.problem_id}, difficulty: {problem.difficulty}")
+        logger.debug(f"[DEBUG] match_id: {match.match_id}, users: {users}, problem: {problem.problem_id}, difficulty: {problem.difficulty}")
 
         presigned = await issue_problem_urls(problem)
 
@@ -85,32 +98,38 @@ async def handle_accept(match_id: int, user_id: int, db: Session):
                 "difficulty": problem.difficulty,
             },
         }
-        print("[DEBUG] ws_manager.broadcast(match_accepted):", msg)
+        logger.debug(f"[DEBUG] Broadcasting match_accepted message: {msg}")
         await ws_manager.broadcast(users, msg)
 
         ws_manager.match_state.pop(match_id, None)
+        logger.info(f"Match {match_id} successfully set up and broadcasted.")
 
 
 async def handle_match_reject(match_id: int, rejecting_user: int):
+    logger.info(f"User {rejecting_user} rejected match {match_id}.")
     if match_id not in ws_manager.match_state:
+        logger.warning(f"Match {match_id} not found for rejection by user {rejecting_user}.")
         return
 
     users = list(ws_manager.match_state[match_id].keys())
     accepted_user_id = [uid for uid in users if uid != rejecting_user][0]  # 상대 유저 ID 추출
     # 상대 유저를 다시 큐에 넣기
     await requeue_user(accepted_user_id)
+    logger.info(f"User {accepted_user_id} re-enqueued after match {match_id} rejection.")
 
     # 거절 브로드캐스트 및 상태 제거
     await ws_manager.broadcast(users, {"type": "match_cancelled", "reason": "rejected", "rejected_by": rejecting_user})
     ws_manager.match_state.pop(match_id, None)
+    logger.info(f"Match {match_id} cancelled due to rejection by user {rejecting_user}.")
 
 
 async def match_cancel(user_id: int):
+    logger.info(f"Cancelling match queue for user {user_id}.")
     user_cache.pop(user_id, None)
     await queue_lock.acquire()
     try:
         await dequeue_user(user_id)
-
+        logger.info(f"User {user_id} dequeued from matching queue.")
     finally:
         queue_lock.release()
 
@@ -119,8 +138,9 @@ async def match_cancel(user_id: int):
 
 @router.get("/match_logs/{user_id}/{count}", response_model=list[schemas.MatchLogSchema])
 async def get_user_match_logs(db: DB, user_id: int, count : int):
+    logger.info(f"Fetching match logs for user {user_id}, count: {count}.")
     match_logs = await service.get_match_logs_by_user_id(db, user_id, count)
-    print(match_logs)
+    logger.debug(f"Retrieved {len(match_logs)} match logs for user {user_id}.")
 
     return match_logs
 
