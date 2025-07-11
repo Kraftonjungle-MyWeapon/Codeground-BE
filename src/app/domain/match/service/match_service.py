@@ -4,6 +4,7 @@ from src.app.domain.match.utils.matcher import hybrid_match, hard_match, force_m
 from datetime import datetime, timezone
 import asyncio
 from sqlalchemy.orm import Session
+from src.app.core.database import get_db  # DB 세션을 가져오기 위한 import 추가
 from src.app.domain.match.crud import match_crud
 from src.app.domain.user.crud.user_crud import get_user_mmr, get_user_by_id
 from src.app.models.models import Match, Problem
@@ -16,7 +17,7 @@ from itertools import count
 
 # 매칭 루프 타이머
 MATCH_INTERVAL = 1  # 초 세팅 0.5 = 500ms
-GO_TO_HARD = 15  # 강제 풀 배치 기준 180 = 180s
+GO_TO_HARD = 10  # 강제 풀 배치 기준 180 = 180s
 match_id_counter = count(1)
 
 
@@ -28,10 +29,12 @@ class MatchService:
     async def _run(self):
         while True:
             await asyncio.sleep(self._interval)
-            await self._tick()
+            # 백그라운드 태스크에서 DB 세션 사용을 위해 수동으로 세션 생성 및 전달
+            with next(get_db()) as db:
+                await self._tick(db)
 
     @staticmethod
-    async def _tick():
+    async def _tick(db: Session):  # DB 세션을 인자로 받도록 수정
         async with queue_lock:
             users = list(normal_queue) + list(hard_queue)
             if len(users) < 2:
@@ -70,8 +73,8 @@ class MatchService:
                     else:
                         hard_queue.append(hard_list[0])
             normal_queue.extend(waiting)
-        # 매칭 성공 쌍에게 매칭 완료 함수 시행
-        await dispatch_pairs(pairs, algo)
+        # 매칭 성공 쌍에게 매칭 완료 함수 시행 (DB 세션 전달)
+        await dispatch_pairs(db, pairs, algo)
 
     def start(self):
 
@@ -87,8 +90,8 @@ class MatchService:
                 pass
 
 
-# 되는거
-async def dispatch_pairs(pairs, algo):
+# 매칭된 사용자 쌍에게 매칭 완료 메시지 전송
+async def dispatch_pairs(db: Session, pairs, algo):
     """
     pairs: List[Tuple[MatchingUserInfo, MatchingUserInfo]]
     """
@@ -101,12 +104,49 @@ async def dispatch_pairs(pairs, algo):
             u2.id: False,
         }
 
+        # 각 사용자의 상세 정보 (닉네임, MMR) 조회
+        user1_data = get_user_by_id(db, u1.id)
+        user2_data = get_user_by_id(db, u2.id)
+
+        user1_mmr = get_user_mmr(db, u1.id)
+        user2_mmr = get_user_mmr(db, u2.id)
+
+        # MMR을 기반으로 티어 계산
+        user1_tier = mmr_to_tier(user1_mmr)
+        user2_tier = mmr_to_tier(user2_mmr)
+
+        # 각 사용자에게 전송할 상대방 정보 구성
+        opponent1_info = {
+            "id": user2_data.user_id,
+            "nickname": user2_data.nickname,
+            "tier": user2_tier,
+        }
+        opponent2_info = {
+            "id": user1_data.user_id,
+            "nickname": user1_data.nickname,
+            "tier": user1_tier,
+        }
+
+        # u1에게 u2의 정보를 포함하여 매칭 완료 메시지 전송
         await ws_manager.broadcast(
-            [u1.id, u2.id],
+            [u1.id],
             {
                 "type": "match_found",
                 "match_id": match_id,
-                "opponent_ids": [u1.id, u2.id],
+                "opponent_ids": [u2.id],  # 상대방 ID만 전송
+                "opponent_info": opponent1_info,  # 상대방 상세 정보 전송
+                "time_limit": 20,
+                "algo": algo,
+            },
+        )
+        # u2에게 u1의 정보를 포함하여 매칭 완료 메시지 전송
+        await ws_manager.broadcast(
+            [u2.id],
+            {
+                "type": "match_found",
+                "match_id": match_id,
+                "opponent_ids": [u1.id],  # 상대방 ID만 전송
+                "opponent_info": opponent2_info,  # 상대방 상세 정보 전송
                 "time_limit": 20,
                 "algo": algo,
             },
