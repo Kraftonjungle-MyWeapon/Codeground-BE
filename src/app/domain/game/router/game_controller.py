@@ -251,13 +251,13 @@ async def broadcast_result(db : Session, game_id: int, user_id: int, opponent_id
 #로컬용
 tiers = ['bronze', 'silver', 'gold', 'platinum', 'diamond']
 
-ROOT_DIR = Path(__file__).resolve().parents[5]   # src → game → domain → app
+ROOT_DIR = Path(__file__).resolve().parents[5]
 
 # 2) data 폴더 절대경로
 DATA_DIR = ROOT_DIR / "data"
 
 @router.get("/for_local")
 async def get_for_local():
-    json_path = DATA_DIR / "prob-bronze.json"    # C:\…\Codeground-Backend\data\prob-bronze.json
+    json_path = DATA_DIR / "cfb8fd36-1204-44cd-a91a-6f932427fbe1.json"    # C:\…\Codeground-Backend\data\prob-bronze.json
     with json_path.open(encoding="utf-8") as f:
         return json.load(f)

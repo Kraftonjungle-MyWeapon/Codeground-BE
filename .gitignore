@@ -73,3 +73,5 @@ prof/*
 /.venv
 /migration/versions/
 /src/resource/static/reports/
+/data/
+/data/
