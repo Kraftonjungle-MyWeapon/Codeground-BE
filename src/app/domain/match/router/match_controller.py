@@ -143,4 +143,3 @@ async def get_user_match_logs(db: DB, user_id: int, count : int):
     logger.debug(f"Retrieved {len(match_logs)} match logs for user {user_id}.")
 
     return match_logs
-

@@ -127,8 +127,9 @@ class Problem(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-    problem_prefix = Column(Text, nullable=False)
-    testcase_prefix = Column(Text, nullable=False)
+    problem_prefix = Column(Text, nullable=True)
+    testcase_prefix = Column(Text, nullable=True)
+    is_approved = Column(Boolean, server_default=text("FALSE"))
 
     match = relationship("Match", back_populates="problem", uselist=False)
     match_logs = relationship("MatchLog", back_populates="problem")

@@ -98,6 +98,8 @@ async def log_requests(request: Request, call_next):
     req_body = await request.body()
     await set_body(request, req_body)
     content_type = request.headers.get("Content-Type", "")
+    request.state.body = req_body
+    request.state.content_type = content_type
     try:
         response = await call_next(request)
     except HTTPException as e:
