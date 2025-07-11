@@ -91,46 +91,60 @@ async def set_body(request: Request, body: bytes):
 
 
 async def log_requests(request: Request, call_next):
+    # SSE 요청은 로깅하지 않음
     if request.headers.get("accept") == "text/event-stream":
         return await call_next(request)
-    if request.url.path.endswith("/") or request.url.path.endswith("/openapi.json"):
-        response = await call_next(request)
-        return response
 
-    req_body = await request.body()
-    await set_body(request, req_body)
+    # docs 등은 제외
+    if request.url.path.endswith("/") or request.url.path.endswith("/openapi.json"):
+        return await call_next(request)
+
+    try:
+        req_body = await request.body()
+    except Exception:
+        req_body = b""
+
     content_type = request.headers.get("Content-Type", "")
     request.state.body = req_body
     request.state.content_type = content_type
+
     try:
         response = await call_next(request)
     except HTTPException as e:
         log_error(request.url, req_body, content_type, e)
-        raise e
+        raise
     except Exception as e:
         log_error(request.url, req_body, content_type, e)
-        raise e
+        raise
+
+    # StreamingResponse 등은 감지 후 로깅 생략
+    if not hasattr(response, "body_iterator"):
+        return response
 
     res_body = b""
-    async for chunk in response.body_iterator:
-        res_body += chunk
-    res_content_type = response.headers.get("Content-Type", "")
+    new_body = []
 
-    if 200 <= response.status_code < 300:
-        log_level = "info"
-    elif 400 <= response.status_code < 500:
-        log_level = "warning"
-    elif 500 <= response.status_code < 600:
-        log_level = "error"
-    else:
-        log_level = "info"
+    try:
+        async for chunk in response.body_iterator:
+            res_body += chunk
+            new_body.append(chunk)
+    except Exception as e:
+        log_error(request.url, req_body, content_type, e)
+        raise
+
+    res_content_type = response.headers.get("Content-Type", "")
+    log_level = (
+        "info" if 200 <= response.status_code < 300
+        else "warning" if 400 <= response.status_code < 500
+        else "error"
+    )
 
     task = BackgroundTask(
         log_info, log_level, request.url, req_body, content_type, response.status_code, res_body, res_content_type
     )
 
     return Response(
-        content=res_body,
+        content=b"".join(new_body),
         status_code=response.status_code,
         headers=dict(response.headers),
         media_type=response.media_type,
