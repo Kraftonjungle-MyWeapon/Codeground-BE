@@ -23,6 +23,7 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     role = Column(Enum(UserRole), nullable=False, server_default="USER")
+    is_banned = Column(Boolean, nullable=False, server_default=text("FALSE")) # 영구 정지 여부 -> True면 해당 유저는 정지 상태
     profile_img_url = Column(Text, nullable=True)  # 프로필 이미지 주소
 
     # 관계 설정
@@ -173,5 +174,4 @@ class CheatReport(Base):
     description = Column(Text, nullable=True)
     video_path = Column(Text, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    # 신고 당한 사람 O, 신고를 한 사람 X
-    reported_user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    is_confirmed = Column(Boolean, nullable=False, server_default=text("FALSE"))    # 관리자가 승인한 신고인지 여부 -> True면 Admin 승인 완료

@@ -7,11 +7,20 @@ from src.app.models.models import User, CheatReport, Problem, MatchLog, Match, R
 def get_all_users(db: Session):
     return db.query(User).all()
 
-# 2. 특정 유저 제재(e.g. ban 처리
+# 2. 특정 유저 제재(영구 정지 처리)
 def ban_user(db: Session, user_id: int):
     user = db.query(User).filter(User.user_id == user_id).first()
-    if user:
-        user.role = 'BANNED'
+    if user and not user.is_banned:
+        user.is_banned = True  # [수정] role이 아닌 is_banned로 관리
+        db.commit()
+        db.refresh(user)
+    return user
+
+# 2-1. 정지 해제(관리자 기능 필요시)
+def unban_user(db: Session, user_id: int):
+    user = db.query(User).filter(User.user_id == user_id).first()
+    if user and user.is_banned:
+        user.is_banned = False
         db.commit()
         db.refresh(user)
     return user
@@ -78,3 +87,17 @@ def get_user_match_history(db: Session, user_id: int):
 # 10. 전체 매칭 이력/검색 (필요시 페이징/필터 확장)
 def get_all_match_logs(db: Session):
     return db.query(MatchLog).all()
+
+# 11. [중요] 자동 영구 정지: 승인된 신고가 3초과일 때 is_banned 처리
+def auto_ban_user_if_needed(db: Session, user_id: int, threshold: int = 3):
+    count = db.query(CheatReport).filter(
+        CheatReport.reported_user_id == user_id,
+        CheatReport.is_confirmed == True
+    ).count()
+    user = db.query(User).filter(User.user_id == user_id).first()
+    if user and count > threshold and not user.is_banned:
+        user.is_banned = True
+        db.commit()
+        db.refresh(user)
+        return True
+    return False
