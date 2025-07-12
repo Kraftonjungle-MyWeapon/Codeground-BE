@@ -1,5 +1,5 @@
 from typing import Annotated
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Response, Query
 from fastapi.responses import RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
 
@@ -21,7 +21,7 @@ async def github_login():
 
 
 @router.get("/callback")
-async def github_callback(code: str, db: DB):
+async def github_callback(code: Annotated[str, Query()], db: Annotated[DB, Depends(get_db)],):
     result = await handle_github_callback(code, db)
 
     if isinstance(result, RedirectResponse):
@@ -49,4 +49,3 @@ async def github_callback(code: str, db: DB):
         domain=domain,
     )
     return response
-
