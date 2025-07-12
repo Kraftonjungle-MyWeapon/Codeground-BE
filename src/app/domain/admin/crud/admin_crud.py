@@ -11,7 +11,70 @@ def get_all_users(db: Session):
 def ban_user(db: Session, user_id: int):
     user = db.query(User).filter(User.user_id == user_id).first()
     if user:
-        user.role = 'BANNED'  # 컬럼명/정책에 따라 다를 수 있음
+        user.role = 'BANNED'
         db.commit()
         db.refresh(user)
     return user
+
+
+# 3. 신고 리스트 조회
+def get_all_reports(db: Session):
+    return db.query(CheatReport).all()
+
+
+# 4. 신고 승인/기각 처리
+def update_report_status(db: Session, report_id: int, new_status: str):
+    report = db.query(CheatReport).filter(CheatReport.report_id == report_id).first()
+    if report:
+        report.status = new_status  # 예: 'APPROVED' 또는 'REJECTED'
+        db.commit()
+        db.refresh(report)
+    return report
+
+
+# 5. 문제 리스트 조회
+def get_all_problems(db: Session):
+    return db.query(Problem).all()
+
+
+# 6. 문제 승인/비승인 처리
+def update_problem_approval(db: Session, problem_id: int, is_approved: bool):
+    problem = db.query(Problem).filter(Problem.problem_id == problem_id).first()
+    if problem:
+        problem.is_approved = is_approved
+        db.commit()
+        db.refresh(problem)
+    return problem
+
+
+# 7. 문제 삭제
+def delete_problem(db: Session, problem_id: int):
+    problem = db.query(Problem).filter(Problem.problem_id == problem_id).first()
+    if problem:
+        db.delete(problem)
+        db.commit()
+        return True
+    return False
+
+
+# 8. 티어별 유저 수(분포) 집계
+def get_tier_distribution(db: Session):
+    # 티어는 UserMmr.rating, 혹은 User 테이블에 별도 컬럼이 있으면 그걸 사용
+    # 예시: 티어 산정 기준을 함수로 따로 만들 수도 있음
+    tier_counts = (
+        db.query(UserMmr.rating, func.count(UserMmr.user_id))
+        .group_by(UserMmr.rating)
+        .all()
+    )
+    # 실제 서비스에서는 rating 구간별("bronze" 등)로 매핑하는 로직이 필요함
+    return tier_counts
+
+
+# 9. 특정 유저의 매칭/게임 히스토리 조회
+def get_user_match_history(db: Session, user_id: int):
+    return db.query(MatchLog).filter(MatchLog.user_id == user_id).all()
+
+
+# 10. 전체 매칭 이력/검색 (필요시 페이징/필터 확장)
+def get_all_match_logs(db: Session):
+    return db.query(MatchLog).all()

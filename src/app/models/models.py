@@ -173,3 +173,5 @@ class CheatReport(Base):
     description = Column(Text, nullable=True)
     video_path = Column(Text, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    # 신고 당한 사람 O, 신고를 한 사람 X
+    reported_user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
