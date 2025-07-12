@@ -71,7 +71,7 @@ async def save_problem(
         if images:
             for img in images:
                 file_bytes = await img.read()
-                key = f"{img.filename}"
+                key = f"problems/images/{img.filename}"
                 await upload_image_to_s3_and_get_url(file_bytes, key, settings.PROBLEM_BUCKET)
                 image_keys.append(key)
 
