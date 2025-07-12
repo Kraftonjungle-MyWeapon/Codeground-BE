@@ -20,3 +20,12 @@ def create_problem(db: Session, problem: Problem) -> Problem:
     db.commit()
     db.refresh(problem)
     return problem
+
+
+def update_problem_keys(db: Session, problem_id: int, body_key: str, image_keys: list[str]) -> None:
+    problem = db.query(Problem).filter(Problem.problem_id == problem_id).first()
+    if problem:
+        problem.body_key = body_key
+        problem.image_keys = image_keys
+        db.commit()
+        db.refresh(problem)
