@@ -12,7 +12,8 @@ async def create_report(
         reason: str = Form(...),
         description: str = Form(...),
         video: UploadFile = File(...),
+        reported_user_id: int = Form(...),
         db: Session = Depends(get_db),
 ):
-    await service.save_report(db, game_id, reason, description, video)
+    await service.save_report(db, game_id, reason, description, video, reported_user_id)
     return {"message": "Report received"}
