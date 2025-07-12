@@ -5,6 +5,7 @@ from src.app.domain.ranking.crud import ranking_crud as crud
 from src.app.domain.ranking.schemas import ranking_schemas as schemas
 from src.app.domain.user.crud.user_crud import get_user_by_id
 from src.app.models.models import UserMmr, Ranking
+from src.app.utils.tier_util import mmr_to_tier, tiers_cnt, tiers
 
 
 # 특정 언어 랭킹 리스트 조회
@@ -81,6 +82,14 @@ async def create_rank(db: Session, user_id: int) -> None:
     user_info = get_user_by_id(db, user_id)
     user_mmr = await get_mmr_by_id(db, user_id)
     user_rank = Ranking(user_id=user_info.user_id, mmr=int(user_mmr.rating), language=user_info.use_lang, rank=0)
+    user_tier = mmr_to_tier(int(user_mmr.rating))
+    tiers_cnt[user_tier] += 1
+    ranking = 0
+    for tier in tiers:
+        ranking += tiers_cnt[tier]
+        if tier == user_tier:
+            break
+    user_rank.rank = ranking
     db.add(user_rank)
     db.commit()
     return

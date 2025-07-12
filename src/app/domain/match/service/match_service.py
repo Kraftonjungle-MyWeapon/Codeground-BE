@@ -8,12 +8,11 @@ from src.app.core.database import get_db  # DB 세션을 가져오기 위한 imp
 from src.app.domain.match.crud import match_crud
 from src.app.domain.user.crud.user_crud import get_user_mmr, get_user_by_id
 from src.app.models.models import Match, Problem
-from src.app.utils.tier_util import mmr_to_tier
+from src.app.utils.tier_util import mmr_to_tier, refresh_tier_cnt
 from src.app.utils.ws_manager import ws_manager
 from src.app.domain.match.schemas.match_schemas import MatchLogSchema
 from src.app.domain.game.crud.game_crud import get_problem_by_id
 from src.app.utils.logging import logger
-
 from itertools import count
 
 # 매칭 루프 타이머
@@ -29,6 +28,10 @@ class MatchService:
 
     async def _run(self):
         logger.info("Match service _run loop started.")
+        #티어 카운트 최신화
+        with next(get_db()) as db:
+            await refresh_tier_cnt(db)
+            logger.info("Tier dic func successed")
         while True:
             await asyncio.sleep(self._interval)
             # 백그라운드 태스크에서 DB 세션 사용을 위해 수동으로 세션 생성 및 전달

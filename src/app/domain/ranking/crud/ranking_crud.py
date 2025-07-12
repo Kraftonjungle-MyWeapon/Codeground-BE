@@ -1,5 +1,5 @@
 from typing import Any, List
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, InstrumentedAttribute
 from sqlalchemy import desc, distinct
 from src.app.models.models import RankChangeLog, Ranking
 
@@ -42,6 +42,9 @@ def insert_rank_change_log(
 
 async def get_rank_by_id(db: Session, user_id: int) -> type[Ranking] | None:
     return db.query(Ranking).filter(Ranking.user_id == user_id).first()
+
+async def get_all_users_mmr(db: Session) -> list[InstrumentedAttribute]:
+    return db.query(Ranking.mmr).all()
 
 
 async def get_users_in_mmr_range(db: Session, min_mmr: float, max_mmr: float) -> list[type[Ranking]]:
