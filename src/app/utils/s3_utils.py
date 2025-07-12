@@ -47,6 +47,18 @@ def upload_bytes(data: bytes, key: str, bucket: str = REPORT_BUCKET) -> None:
         # raise RuntimeError(f"S3 업로드 실패: {key}, 에러: {e}")
 
 
+def get_s3_public_url(bucket: str, key: str) -> str:
+    """Constructs the public URL for an S3 object."""
+    return f"https://{bucket}.s3.{REGION}.amazonaws.com/{key}"
+
+async def upload_image_to_s3_and_get_url(file_bytes: bytes, key: str, bucket: str) -> str:
+    """Uploads image bytes to S3 and returns its public URL."""
+    try:
+        s3.put_object(Bucket=bucket, Key=key, Body=file_bytes)
+        return get_s3_public_url(bucket, key)
+    except Exception as e:
+        raise RuntimeError(f"Failed to upload image to S3: {e}")
+
 async def upload_profile_image_to_s3(file: UploadFile) -> str:
     if not PROFILE_IMAGE_BUCKET:
         raise ValueError("PROFILE_IMAGE_BUCKET is not configured.")

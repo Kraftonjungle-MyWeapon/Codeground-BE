@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import uuid
+import re
 from pathlib import Path
 from typing import List, Optional
 
@@ -10,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from src.app.config.config import settings
 from src.app.models.models import Problem, ProblemDifficultyByTiers
-from src.app.utils.s3_utils import upload_bytes
+from src.app.utils.s3_utils import upload_bytes, upload_image_to_s3_and_get_url
 from src.app.domain.problem.crud import problem_crud
 
 from ..schemas.problem_schemas import ProblemCreateRequest
@@ -38,21 +39,25 @@ async def save_problem(
         if images:
             for img in images:
                 file_bytes = await img.read()
-                img_path = DATA_DIR / f"{problem_uuid}_{img.filename}"
+                img_path = DATA_DIR / f"{img.filename}"
                 with open(img_path, "wb") as fp:
                     fp.write(file_bytes)
-                image_keys.append(str(img_path))
+                # Store local file path as a URL-like string for consistency
+                image_keys.append(f"file://{img_path}")
     else:
         body_key = f"problems/{problem_uuid}.json"
         json_bytes = json.dumps(problem_data.model_dump(), ensure_ascii=False).encode("utf-8")
         upload_bytes(json_bytes, body_key, bucket=settings.PROBLEM_BUCKET)
 
         if images:
-            for idx, img in enumerate(images):
+            uploaded_image_urls = []
+            for img in images:
                 file_bytes = await img.read()
-                key = f"problems/{problem_uuid}/images/{idx}_{img.filename}"
-                upload_bytes(file_bytes, key, bucket=settings.PROBLEM_BUCKET)
-                image_keys.append(key)
+                # Use the full filename as part of the S3 key, as frontend will send it in the correct format
+                key = f"problems/{problem_uuid}/images/{img.filename}"
+                s3_url = await upload_image_to_s3_and_get_url(file_bytes, key, settings.PROBLEM_BUCKET)
+                uploaded_image_urls.append(s3_url)
+            image_keys = uploaded_image_urls
 
     new_problem = Problem(
         title=problem_data.title,

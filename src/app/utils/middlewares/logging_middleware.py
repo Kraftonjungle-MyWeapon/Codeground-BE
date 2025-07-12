@@ -19,7 +19,10 @@ def partial_mask(value):
 
 def sanitize_data(data, content_type):
     if isinstance(data, bytes):
-        data = data.decode("utf-8")
+        try:
+            data = data.decode("utf-8")
+        except UnicodeDecodeError:
+            return "[binary data omitted]"
 
     if content_type == "application/json":
         try:
@@ -36,6 +39,7 @@ def sanitize_data(data, content_type):
         return urlencode(sanitized_dict)
     else:
         return data
+
 
 
 def sanitize_dict(data_dict):
