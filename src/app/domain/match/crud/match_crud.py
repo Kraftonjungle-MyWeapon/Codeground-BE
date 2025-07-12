@@ -61,3 +61,12 @@ async def get_match_log_by_user_index(db: Session, user_id: int, index: int) -> 
     stmt = (select(MatchLog).where(MatchLog.user_id == user_id).order_by(MatchLog.created_at.desc()).offset(start).limit(LOGS_PER_CLICK))
     result = db.execute(stmt)
     return result.scalars().all()
+
+
+def get_problem_id_from_match_id(db: Session, match_id: int) -> str:
+    # match_id로부터 문제 ID를 가져오는 함수
+    # `match` 테이블의 `problem_id` 컬럼을 사용하여 문제 ID를 조회
+    match = db.query(Match).filter(Match.match_id == match_id).first()
+    if match is None:
+        raise ValueError(f"No match found with ID {match_id}")
+    return str(match.problem_id)
