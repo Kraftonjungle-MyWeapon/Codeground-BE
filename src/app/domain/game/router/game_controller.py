@@ -81,14 +81,8 @@ async def game_websocket(db: DB, websocket: WebSocket, game_id: int, user_id: in
                 logger.info(f"User {user_id} permanently left game {game_id}")
                 # 상대방에게 이탈 알림
                 if game_rooms.get(game_id):
-                    await broadcast_to_room(
-                        game_id,
-                        {
-                            "type": "opponent_left",
-                            "user_id": user_id,
-                            "message": "상대방이 연결을 종료했습니다. 계속 문제를 푸시하시겠습니까?"
-                        }
-                    )
+                    opponent_id = [uid for uid in game_user_map[game_id] if uid != user_id][0]
+                    await process_match_result(db, game_id, user_id, opponent_id, "abandon")
                 # 방 정리
                 if not game_rooms.get(game_id):
                     logger.info(f"Closing game room {game_id}")
