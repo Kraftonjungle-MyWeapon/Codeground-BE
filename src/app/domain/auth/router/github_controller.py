@@ -28,10 +28,15 @@ async def github_callback(code: str, db: DB):
         return result  # 이메일 중복 등은 여전히 Redirect로 처리
 
     user, is_new_user = result
-    access_token = create_access_token(subject=user.email)  # ✅ user.email → user.user_id
+    access_token = create_access_token(subject=user.email)
 
-    response = JSONResponse(content={"message": "Login successful", "is_new_user": is_new_user})
+    # ✅ 프론트엔드로 리디렉션
+    response = RedirectResponse(
+        url=f"{settings.FRONTEND_REDIRECT_URL}?is_new_user={str(is_new_user).lower()}",
+        status_code=302
+    )
 
+    # ✅ 쿠키 설정
     secure, samesite, domain, http_only = get_cookie_options()
     response.set_cookie(
         key="access_token",

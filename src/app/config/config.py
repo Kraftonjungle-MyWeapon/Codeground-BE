@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     GITHUB_CLIENT_SECRET: str = os.environ.get("GITHUB_CLIENT_SECRET", "")
     REPORT_BUCKET: str = os.environ.get("REPORT_BUCKET", "")
     PROFILE_IMAGE_BUCKET: str = os.environ.get("PROFILE_IMAGE_BUCKET", "")
-    github_redirect_uri: str
+    GITHUB_REDIRECT_URL: str
 
     class Config:
         env_file = ENV_PATH
