@@ -50,14 +50,14 @@ async def save_problem(
         upload_bytes(json_bytes, body_key, bucket=settings.PROBLEM_BUCKET)
 
         if images:
-            uploaded_image_urls = []
+            uploaded_image_keys = []
             for img in images:
                 file_bytes = await img.read()
                 # Use the full filename as part of the S3 key, as frontend will send it in the correct format
                 key = f"problems/{problem_uuid}/images/{img.filename}"
-                s3_url = await upload_image_to_s3_and_get_url(file_bytes, key, settings.PROBLEM_BUCKET)
-                uploaded_image_urls.append(s3_url)
-            image_keys = uploaded_image_urls
+                await upload_image_to_s3_and_get_url(file_bytes, key, settings.PROBLEM_BUCKET)
+                uploaded_image_keys.append(key)
+            image_keys = uploaded_image_keys
 
     new_problem = Problem(
         title=problem_data.title,
