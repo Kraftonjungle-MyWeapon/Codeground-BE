@@ -1,8 +1,18 @@
 from fastapi import Depends, WebSocket, WebSocketDisconnect, APIRouter, Query
 from src.app.domain.match.crud.match_crud import get_log_by_game_id
-from src.app.utils.game_session import game_rooms, game_user_map, ready_status, disconnected_users
+from src.app.utils.game_session import (
+    game_rooms,
+    game_user_map,
+    ready_status,
+    disconnected_users,
+    end_times,
+    is_paused,
+    remaining_time_on_pause,
+    timer_tasks,
+)
 import json
 import asyncio
+import time
 from src.app.domain.game.service.game_result_service import update_user_log, update_match, get_mmr_earned
 from typing import Annotated
 from sqlalchemy.orm import Session
@@ -15,6 +25,60 @@ DB = Annotated[Session, Depends(get_db)]
 
 # 새로고침 등으로 인한 일시적 끊김 후 재접속을 기다리는 시간 (초)
 RECONNECT_TIMEOUT = 5
+
+DEFAULT_GAME_DURATION = 30 * 60  # 30분
+
+
+def get_time_left(game_id: int) -> int:
+    if is_paused.get(game_id):
+        return int(remaining_time_on_pause.get(game_id, 0))
+    end = end_times.get(game_id)
+    if end is None:
+        return 0
+    return max(int(end - time.time()), 0)
+
+
+async def start_game_timer(game_id: int, duration: int = DEFAULT_GAME_DURATION):
+    end_times[game_id] = time.time() + duration
+    is_paused[game_id] = False
+    remaining_time_on_pause.pop(game_id, None)
+    task = timer_tasks.get(game_id)
+    if task:
+        task.cancel()
+    timer_tasks[game_id] = asyncio.create_task(periodic_timer_sync(game_id))
+    await broadcast_to_room(game_id, {"type": "timer_sync", "timeLeft": get_time_left(game_id)})
+
+
+def pause_game_timer(game_id: int):
+    if not is_paused.get(game_id):
+        remaining_time_on_pause[game_id] = get_time_left(game_id)
+        is_paused[game_id] = True
+        task = timer_tasks.pop(game_id, None)
+        if task:
+            task.cancel()
+
+
+async def resume_game_timer(game_id: int):
+    if is_paused.get(game_id):
+        end_times[game_id] = time.time() + remaining_time_on_pause.get(game_id, 0)
+        is_paused[game_id] = False
+        await broadcast_to_room(game_id, {"type": "timer_sync", "timeLeft": get_time_left(game_id)})
+        remaining_time_on_pause.pop(game_id, None)
+        timer_tasks[game_id] = asyncio.create_task(periodic_timer_sync(game_id))
+
+
+async def periodic_timer_sync(game_id: int, interval: int = 5):
+    try:
+        while True:
+            await asyncio.sleep(interval)
+            if is_paused.get(game_id):
+                continue
+            time_left = get_time_left(game_id)
+            await broadcast_to_room(game_id, {"type": "timer_sync", "timeLeft": time_left})
+            if time_left <= 0:
+                break
+    except asyncio.CancelledError:
+        pass
 
 
 @router.websocket("/ws/game/{game_id}")
@@ -49,8 +113,9 @@ async def game_websocket(db: DB, websocket: WebSocket, game_id: int, user_id: in
                 "game_id": game_id,
                 "message": "상대방이 다시 연결되었습니다.",
             },
-            exclude=websocket
+            exclude=websocket,
         )
+        await websocket.send_json({"type": "timer_sync", "timeLeft": get_time_left(game_id)})
     game_rooms[game_id].append(websocket)
     ready_status[game_id][user_id] = False
     logger.info(f"User {user_id} connected to game {game_id}")
@@ -89,6 +154,12 @@ async def game_websocket(db: DB, websocket: WebSocket, game_id: int, user_id: in
                     game_rooms.pop(game_id, None)
                     ready_status.pop(game_id, None)
                     disconnected_users.pop(game_id, None)
+                    task = timer_tasks.pop(game_id, None)
+                    if task:
+                        task.cancel()
+                    end_times.pop(game_id, None)
+                    remaining_time_on_pause.pop(game_id, None)
+                    is_paused.pop(game_id, None)
 
         # 백그라운드로 실행
         asyncio.create_task(delayed_leave())
@@ -119,6 +190,7 @@ async def handle_game_message(db, websocket: WebSocket, game_id: int, user_id: i
             if all(ready_status[game_id].values()):
                 logger.info(f"All players are ready in game {game_id}")
                 await broadcast_to_room(game_id, {"type": "all_ready"})
+                await start_game_timer(game_id)
 
         elif message_type == "system_warning":
             await broadcast_to_room(game_id, {
@@ -164,6 +236,13 @@ async def handle_game_message(db, websocket: WebSocket, game_id: int, user_id: i
                 exclude=websocket
             )
 
+        elif message_type == "pause_timer":
+            pause_game_timer(game_id)
+            await broadcast_to_room(game_id, {"type": "timer_paused"})
+
+        elif message_type == "resume_timer":
+            await resume_game_timer(game_id)
+
         # 제출 / 시간초과 / 항복 시 여기로
         # 각 reason 은 "finish" / "timeout" / "surrender"
         elif message_type == "match_result":
@@ -200,6 +279,13 @@ async def broadcast_to_room(game_id: int, message: dict, exclude: WebSocket = No
 
 
 async def process_match_result(db: Session, game_id: int, user_id: int, opponent_id: int, reason: str) -> None:
+    # 정리: 타이머 종료
+    task = timer_tasks.pop(game_id, None)
+    if task:
+        task.cancel()
+    end_times.pop(game_id, None)
+    remaining_time_on_pause.pop(game_id, None)
+    is_paused.pop(game_id, None)
 
     # 동시 적용 시
     user_log = await get_log_by_game_id(db, game_id, user_id)
@@ -227,7 +313,8 @@ async def process_match_result(db: Session, game_id: int, user_id: int, opponent
     return await broadcast_result(db, game_id, user_id, opponent_id, winner_id, reason)
 
 
-async def broadcast_result(db : Session, game_id: int, user_id: int, opponent_id: int, winner_id : int | None, reason: str | None) -> None:
+async def broadcast_result(db: Session, game_id: int, user_id: int, opponent_id: int, winner_id: int | None,
+                           reason: str | None) -> None:
     if reason:
         user_earned = await get_mmr_earned(db, game_id, user_id)
         opponent_earned = await get_mmr_earned(db, game_id, opponent_id)
@@ -242,7 +329,7 @@ async def broadcast_result(db : Session, game_id: int, user_id: int, opponent_id
         return
 
 
-#로컬용
+# 로컬용
 tiers = ['bronze', 'silver', 'gold', 'platinum', 'diamond']
 
 ROOT_DIR = Path(__file__).resolve().parents[5]
@@ -250,8 +337,9 @@ ROOT_DIR = Path(__file__).resolve().parents[5]
 # 2) data 폴더 절대경로
 DATA_DIR = ROOT_DIR / "data"
 
+
 @router.get("/for_local")
 async def get_for_local():
-    json_path = DATA_DIR / "cfb8fd36-1204-44cd-a91a-6f932427fbe1.json"    # C:\…\Codeground-Backend\data\prob-bronze.json
+    json_path = DATA_DIR / "cfb8fd36-1204-44cd-a91a-6f932427fbe1.json"  # C:\…\Codeground-Backend\data\prob-bronze.json
     with json_path.open(encoding="utf-8") as f:
         return json.load(f)
