@@ -22,6 +22,7 @@ from src.app.domain.match.service.match_service import match_service
 from src.app.domain.ranking.router.ranking_controller import router as ranking_router
 from src.app.domain.auth.router.github_controller import router as github_router
 from src.app.domain.ranking.service.ranking_scheduler import start_ranking_scheduler
+from src.app.domain.admin.router.admin_controller import router as admin_router
 
 from src.app.utils.middlewares.domain_limiter import DomainLimiterMiddleware
 
@@ -81,8 +82,8 @@ app.include_router(router=game_router, prefix=settings.API_V1_STR)
 app.include_router(router=ranking_router, prefix=settings.API_V1_STR)
 app.include_router(router=analysis_router, prefix=settings.API_V1_STR)
 app.include_router(router=report_router, prefix=settings.API_V1_STR)
-
 app.include_router(router=problem_router, prefix=settings.API_V1_STR)
+app.include_router(router=admin_router, prefix=settings.API_V1_STR)
 
 
 @app.get("/")

@@ -18,7 +18,8 @@ async def save_report(
     game_id: int | None,
     reason: str,
     description: str,
-    video: UploadFile
+    video: UploadFile,
+    reported_user_id: int
 ) -> None:
     file_name = f"{uuid.uuid4()}.webm"
     env = (getattr(settings, "ENV", None) or getattr(settings, "ENVIRONMENT", None) or "local").lower()
@@ -37,4 +38,4 @@ async def save_report(
         upload_bytes(file_bytes, s3_key, bucket=settings.REPORT_BUCKET)
         video_path = s3_key
 
-    report_crud.create_report(db, game_id, reason, description, video_path)
+    report_crud.create_report(db, game_id, reason, description, video_path, reported_user_id)
