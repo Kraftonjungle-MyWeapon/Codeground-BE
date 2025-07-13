@@ -1,7 +1,7 @@
 from src.app.models.models import MatchLog
 from typing import Optional, Sequence
 from sqlalchemy.orm import Session
-from src.app.models.models import Match, UserMmr
+from src.app.models.models import Match, UserMmr, Problem
 from sqlalchemy import select
 
 LOGS_PER_CLICK = 15
@@ -55,18 +55,19 @@ async def create_match_logs(db: Session, match_id: int, user_ids: list[int], pro
     db.commit()
     return
 
-
 async def get_match_log_by_user_index(db: Session, user_id: int, index: int) -> Sequence[MatchLog]:
     start = index * LOGS_PER_CLICK
     stmt = (select(MatchLog).where(MatchLog.user_id == user_id).order_by(MatchLog.created_at.desc()).offset(start).limit(LOGS_PER_CLICK))
     result = db.execute(stmt)
     return result.scalars().all()
 
-
-def get_problem_id_from_match_id(db: Session, match_id: int) -> str:
-    # match_id로부터 문제 ID를 가져오는 함수
-    # `match` 테이블의 `problem_id` 컬럼을 사용하여 문제 ID를 조회
+def get_body_key_from_match_id(db: Session, match_id: int) -> str:
+    # match_id로부터 body_key를 가져오는 함수
+    # match 테이블에서 problem_id를 얻고, problem 테이블에서 body_key를 조회
     match = db.query(Match).filter(Match.match_id == match_id).first()
     if match is None:
         raise ValueError(f"No match found with ID {match_id}")
-    return str(match.problem_id)
+    problem = db.query(Problem).filter(Problem.problem_id == match.problem_id).first()
+    if problem is None:
+        raise ValueError(f"No problem found with ID {match.problem_id}")
+    return getattr(problem, "body_key")
