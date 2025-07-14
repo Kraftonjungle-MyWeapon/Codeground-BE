@@ -60,7 +60,7 @@ async def update_my_profile(
         unique_filename = f"{uuid.uuid4()}-{profile_image.filename}"
         s3_key = f"profile_images/{unique_filename}"
         try:
-            s3.put_object(Bucket=PROFILE_IMAGE_BUCKET, Key=s3_key, Body=contents, ACL="public-read")  # ✅ 직접 업로드
+            s3.put_object(Bucket=PROFILE_IMAGE_BUCKET, Key=s3_key, Body=contents)  # ✅ 직접 업로드
             user.profile_img_url = s3_key
             logger.info(f"Profile image uploaded to {s3_key} for user ID: {user_id}")
         except Exception as e:

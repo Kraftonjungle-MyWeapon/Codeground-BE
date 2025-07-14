@@ -54,7 +54,7 @@ def get_s3_public_url(bucket: str, key: str) -> str:
 async def upload_image_to_s3_and_get_url(file_bytes: bytes, key: str, bucket: str) -> str:
     """Uploads image bytes to S3 and returns its public URL."""
     try:
-        s3.put_object(Bucket=bucket, Key=key, Body=file_bytes, ACL="public-read")
+        s3.put_object(Bucket=bucket, Key=key, Body=file_bytes)
         return get_s3_public_url(bucket, key)
     except Exception as e:
         raise RuntimeError(f"Failed to upload image to S3: {e}")
