@@ -1,12 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, File, UploadFile, Form
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, Form
 from sqlalchemy.orm import Session
+from typing import Optional
 from src.app.core.database import get_db
 from src.app.core.security import get_current_user
+from src.app.domain.match.crud.match_crud import get_mmr_by_id
 from src.app.domain.ranking.crud.ranking_crud import get_rank_by_id
 from src.app.domain.user.schemas import user_schemas as schemas
 from src.app.domain.user.service import user_service as service
 from src.app.models.models import User
-from src.app.domain.match.crud.match_crud import get_mmr_by_id
 from src.app.utils.logging import logger
 
 router = APIRouter()
@@ -39,18 +40,14 @@ async def get_user_me(
 
 @router.put("/me", response_model=schemas.UserUpdateResponse)
 async def update_my_profile_handler(
-    nickname: str = Form(None),
-    current_password: str = Form(None),
-    new_password: str = Form(None),
-    profile_image: UploadFile = File(None),
+    nickname: Optional[str] = Form(None),
+    current_password: Optional[str] = Form(None),
+    new_password: Optional[str] = Form(None),
+    profile_image: Optional[UploadFile] = File(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     logger.info(f"Updating user profile for user ID: {current_user.user_id}")
-    profile_img_url_str = None
-    if profile_image:
-        from src.app.utils.image_utils import upload_profile_image
-        profile_img_url_str = await upload_profile_image(profile_image)
 
     updated_user = await service.update_my_profile(
         db=db,
@@ -58,8 +55,9 @@ async def update_my_profile_handler(
         nickname=nickname,
         current_password=current_password,
         new_password=new_password,
-        profile_img_url=profile_img_url_str,
+        profile_image=profile_image,
     )
+
     if not updated_user:
         logger.warning(f"Failed to update user profile for user ID: {current_user.user_id}")
         raise HTTPException(status_code=400, detail="Failed to update user info")
@@ -79,8 +77,8 @@ async def update_my_profile_handler(
         "profile_img_url": updated_user.profile_img_url,
         "user_mmr": int(mmr),
         "user_rank": int(rank),
+        "role": updated_user.role.value if hasattr(updated_user.role, "value") else str(updated_user.role),
     }
-
 
     return schemas.UserUpdateResponse(
         message="회원 정보가 성공적으로 수정되었습니다.",

@@ -2,7 +2,7 @@ from pydantic import BaseModel, EmailStr, HttpUrl, ConfigDict, model_validator
 from typing import Optional
 from datetime import datetime
 from fastapi import HTTPException
-
+from src.app.utils.s3_utils import get_s3_public_url, PROFILE_IMAGE_BUCKET
 
 # ✅ MMR 상세 표현용
 class MyMmr(BaseModel):
@@ -13,10 +13,9 @@ class MyMmr(BaseModel):
 
 # ✅ 사용자 정보 수정 요청
 class UserUpdateRequest(BaseModel):
-    current_password: Optional[str] = None  # 변경 전 비밀번호 확인용
-    new_password: Optional[str] = None
     nickname: Optional[str] = None
-    profile_img_url: Optional[HttpUrl] = None
+    current_password: Optional[str] = None
+    new_password: Optional[str] = None
 
 
 # ✅ 최소 정보 반환용
@@ -116,7 +115,14 @@ class UserDto(BaseModel):
         if isinstance(raw_mmr, int):
             name, level, lp = parse_tier_from_mmr(raw_mmr)
             values["my_mmr"] = MyMmr(name=name, level=level, lp=lp)
+
+        # ✅ profile_img_url 처리 (S3 key -> 전체 URL)
+        raw_profile = values.get("profile_img_url")
+        if raw_profile and not raw_profile.startswith("http"):
+            values["profile_img_url"] = get_s3_public_url(PROFILE_IMAGE_BUCKET, raw_profile)
+
         return values
+
 
 
 # ✅ 최근 경기 기록용

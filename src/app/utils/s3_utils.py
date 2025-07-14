@@ -1,6 +1,6 @@
-# src/app/utils/s3_utils.py
 import boto3
-from typing import TypedDict, List
+from typing_extensions import TypedDict
+from typing import List
 from src.app.models.models import Problem
 from src.app.config.config import settings
 from fastapi import UploadFile
@@ -54,20 +54,10 @@ def get_s3_public_url(bucket: str, key: str) -> str:
 async def upload_image_to_s3_and_get_url(file_bytes: bytes, key: str, bucket: str) -> str:
     """Uploads image bytes to S3 and returns its public URL."""
     try:
-        s3.put_object(Bucket=bucket, Key=key, Body=file_bytes)
+        s3.put_object(Bucket=bucket, Key=key, Body=file_bytes, ACL="public-read")
         return get_s3_public_url(bucket, key)
     except Exception as e:
         raise RuntimeError(f"Failed to upload image to S3: {e}")
-
-def sign_profile_image_url(key: str, ttl: int = 3600) -> str:
-    try:
-        return s3.generate_presigned_url(
-            "get_object",
-            Params={"Bucket": PROFILE_IMAGE_BUCKET, "Key": key},
-            ExpiresIn=ttl,
-        )
-    except Exception as e:
-        raise RuntimeError(f"Failed to generate presigned URL for profile image: {e}")
 
 
 async def upload_profile_image_to_s3(file: UploadFile) -> str:
@@ -80,10 +70,12 @@ async def upload_profile_image_to_s3(file: UploadFile) -> str:
 
     try:
         contents = await file.read()
-        upload_bytes(contents, s3_key, bucket=PROFILE_IMAGE_BUCKET)
 
-        # ✅ presigned URL로 반환
-        return sign_profile_image_url(s3_key)
+        # ✅ 직접 S3 업로드 (presigned NO)
+        s3.put_object(Bucket=PROFILE_IMAGE_BUCKET, Key=s3_key, Body=contents)
+
+        # ✅ 퍼블릭 URL 생성 후 반환
+        return get_s3_public_url(PROFILE_IMAGE_BUCKET, s3_key)
     except Exception as e:
         raise RuntimeError(f"Failed to upload profile image to S3: {e}")
 

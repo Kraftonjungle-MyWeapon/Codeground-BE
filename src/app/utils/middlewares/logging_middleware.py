@@ -57,7 +57,11 @@ def sanitize_dict(data_dict):
 
 
 def log_info(level, url, req_body, content_type, status_code, res_body, res_content_type):
-    sanitized_req_body = sanitize_data(req_body, content_type)
+    if "multipart/form-data" in content_type:
+        sanitized_req_body = "[multipart form-data omitted]"
+    else:
+        sanitized_req_body = sanitize_data(req_body, content_type)
+
     sanitized_res_body = sanitize_data(res_body, res_content_type)
 
     extra_info = {
@@ -76,7 +80,11 @@ def log_info(level, url, req_body, content_type, status_code, res_body, res_cont
 
 
 def log_error(url, req_body, content_type, error):
-    sanitized_req_body = sanitize_data(req_body, content_type)
+    if "multipart/form-data" in content_type:
+        sanitized_req_body = "[multipart form-data omitted]"
+    else:
+        sanitized_req_body = sanitize_data(req_body, content_type)
+
     error_traceback = traceback.format_exc()
     extra_info = {
         "request_url": str(url),

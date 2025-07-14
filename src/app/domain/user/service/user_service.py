@@ -1,10 +1,11 @@
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status, UploadFile
 from sqlalchemy.orm import Session
 from src.app.domain.user.crud import user_crud as crud
 from src.app.domain.user.schemas import user_schemas as schemas
 from src.app.core.password import get_password_hash, verify_password as verify_pw
 from src.app.utils.logging import logger
-
+from src.app.utils.s3_utils import PROFILE_IMAGE_BUCKET, s3
+import uuid
 
 async def get_user_data(db: Session, input_id: int) -> schemas.UserDto:
     logger.info(f"Attempting to retrieve user data for ID: {input_id}")
@@ -22,7 +23,7 @@ async def update_my_profile(
     nickname: str | None,
     current_password: str | None,
     new_password: str | None,
-    profile_img_url: str | None = None,
+    profile_image: UploadFile | None = None,
 ):
     logger.info(f"Attempting to update profile for user ID: {user_id}")
     user = crud.get_user_by_id(db, user_id)
@@ -54,9 +55,17 @@ async def update_my_profile(
         else:
             logger.info(f"Nickname updated for user ID: {user_id}")
 
-    if profile_img_url:
-        user.profile_img_url = profile_img_url
-        logger.info(f"Profile image URL updated for user ID: {user_id}")
+    if profile_image:
+        contents = await profile_image.read()  # ✅ 한 번만 읽고
+        unique_filename = f"{uuid.uuid4()}-{profile_image.filename}"
+        s3_key = f"profile_images/{unique_filename}"
+        try:
+            s3.put_object(Bucket=PROFILE_IMAGE_BUCKET, Key=s3_key, Body=contents, ACL="public-read")  # ✅ 직접 업로드
+            user.profile_img_url = s3_key
+            logger.info(f"Profile image uploaded to {s3_key} for user ID: {user_id}")
+        except Exception as e:
+            logger.error(f"Failed to upload profile image for user {user_id}: {e}")
+            raise HTTPException(status_code=500, detail="Failed to upload profile image")
 
     crud.update_user(db, user)
     logger.info(f"Profile update complete for user ID: {user_id}")

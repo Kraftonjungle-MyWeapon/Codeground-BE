@@ -49,14 +49,20 @@ app = FastAPI(lifespan=lifespan)
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    body = getattr(request.state, "body", b"")
-    content_type = getattr(request.state, "content_type", "")
-    decoded_body = body.decode("utf-8") if body else ""
-    logger.error(f"Validation error on {request.url}: {exc.errors()}")
-    logger.error(f"Body: {decoded_body}")
+    try:
+        body = await request.body()
+        if "multipart/form-data" in request.headers.get("content-type", ""):
+            decoded_body = "[multipart form-data omitted]"
+        else:
+            decoded_body = body.decode("utf-8") if body else ""
+    except Exception:
+        decoded_body = "[unreadable body]"
+
+    logger.warning(f"Validation error: {exc}", extra={"request_url": str(request.url), "body": decoded_body})
+
     return JSONResponse(
         status_code=400,
-        content={"detail": exc.errors()},
+        content={"detail": exc.errors(), "body": decoded_body},
     )
 
 
