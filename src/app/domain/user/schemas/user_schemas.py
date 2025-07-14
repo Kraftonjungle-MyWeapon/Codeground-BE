@@ -30,6 +30,7 @@ class UserResponseDto(BaseModel):
     email: str
     username: str
     nickname: str
+    role: str
     use_lang: str
     user_mmr: int
     user_rank : int
@@ -101,6 +102,7 @@ class UserDto(BaseModel):
     email: str
     username: str
     nickname: str
+    role: str
     use_lang: str
     profile_img_url: Optional[str] = None
     my_mmr: Optional[MyMmr] = None  # 변환된 형태로 제공

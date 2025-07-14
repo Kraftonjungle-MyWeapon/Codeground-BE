@@ -28,6 +28,7 @@ async def get_user_me(
         user_dict = user.model_dump()
         user_dict["user_mmr"] = int(mmr)
         user_dict["user_rank"] = int(user_rank)
+        user_dict["role"] = user.role.value if hasattr(user.role, "value") else str(user.role)
         logger.info(f"Successfully fetched profile for user ID: {current_user.user_id}")
         return schemas.UserResponseDto(**user_dict)
 
