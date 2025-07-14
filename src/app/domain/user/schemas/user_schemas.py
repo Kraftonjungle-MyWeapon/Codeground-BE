@@ -33,8 +33,18 @@ class UserResponseDto(BaseModel):
     use_lang: str
     user_mmr: int
     user_rank : int
-    model_config = {"from_attributes": True}
     profile_img_url: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+    @classmethod
+    @model_validator(mode="before")
+    def convert_profile_url(cls, values: dict):
+        raw_profile = values.get("profile_img_url")
+        if raw_profile and not raw_profile.startswith("http"):
+            values["profile_img_url"] = get_s3_public_url(PROFILE_IMAGE_BUCKET, raw_profile)
+        return values
+
 
 # ✅ 사용자 요청 DTO
 class UserRequestDto(BaseModel):
