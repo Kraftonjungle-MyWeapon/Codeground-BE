@@ -20,6 +20,7 @@ class AdminReportOut(BaseModel):
     reported_user_id: int
     reason: str
     description: Optional[str]
+    is_approved: Optional[bool]
     created_at: datetime
 
     class Config:
