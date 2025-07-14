@@ -85,3 +85,16 @@ async def update_my_profile_handler(
         message="회원 정보가 성공적으로 수정되었습니다.",
         user=schemas.UserResponseDto(**user_dict),
     )
+
+
+@router.delete("/me")
+async def delete_my_account(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """회원 탈퇴 처리."""
+    logger.info(f"Deleting account for user ID: {current_user.user_id}")
+    success = await service.delete_my_account(db, current_user.user_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"message": "회원 탈퇴가 완료되었습니다."}

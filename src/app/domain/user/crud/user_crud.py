@@ -19,6 +19,18 @@ def update_user(db: Session, user: User):
     return user
 
 
+def delete_user(db: Session, user_id: int) -> bool:
+    """Delete user and related MMR information."""
+    user = db.query(User).filter(User.user_id == user_id).first()
+    if not user:
+        return False
+
+    db.query(UserMmr).filter(UserMmr.user_id == user_id).delete()
+    db.delete(user)
+    db.commit()
+    return True
+
+
 def get_user_mmr(db: Session, user_id: int) -> int:
     mmr_obj = db.query(UserMmr).filter(UserMmr.user_id == user_id).first()
     return mmr_obj.rating if mmr_obj else 1000
