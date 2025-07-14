@@ -61,3 +61,13 @@ async def update_my_profile(
     crud.update_user(db, user)
     logger.info(f"Profile update complete for user ID: {user_id}")
     return user
+
+
+async def delete_my_account(db: Session, user_id: int) -> bool:
+    """Delete the user account."""
+    logger.info(f"Attempting to delete account for user ID: {user_id}")
+    try:
+        return crud.delete_user(db, user_id)
+    except Exception as e:
+        logger.error(f"Failed to delete user {user_id}: {e}")
+        raise
