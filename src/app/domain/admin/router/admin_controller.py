@@ -21,8 +21,18 @@ router = APIRouter(
 # (1) 전체 유저 목록을 조회하는 엔드포인트
 @router.get("/users", response_model=List[AdminUserOut])
 def get_all_users(db: Session = Depends(get_db)):
-    users = admin_crud.get_all_users(db)
-    return users  # orm_mode=True이므로 객체 반환만으로 자동 직렬화
+    users_with_reports = admin_crud.get_all_users_with_report_count(db)
+    result = []
+    for user, report_count in users_with_reports:
+        result.append({
+            "user_id": user.user_id,
+            "email": user.email,
+            "nickname": user.nickname,
+            "is_banned": user.is_banned,
+            "report_count": report_count,
+            "created_at": user.created_at,
+        })
+    return result
 
 # (2) 특정 유저를 영구정지 처리하는 엔드포인트
 @router.post("/users/{user_id}/ban", response_model=AdminUserBanResult)

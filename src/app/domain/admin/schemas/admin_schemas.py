@@ -8,7 +8,7 @@ class AdminUserOut(BaseModel):
     email: str
     nickname: str
     is_banned: bool
-    role: str
+    report_count: int
     created_at: datetime
 
     class Config:
@@ -20,7 +20,6 @@ class AdminReportOut(BaseModel):
     reported_user_id: int
     reason: str
     description: Optional[str]
-    is_confirmed: bool
     created_at: datetime
 
     class Config:
@@ -53,7 +52,6 @@ class AdminUserBanResult(BaseModel):
 # 6. 신고 승인 결과
 class AdminReportConfirmResult(BaseModel):
     report_id: int
-    is_confirmed: bool
 
 # 7. 문제 승인 결과
 class AdminProblemApproveResult(BaseModel):

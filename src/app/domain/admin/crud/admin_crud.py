@@ -16,13 +16,19 @@ def ban_user(db: Session, user_id: int):
         db.refresh(user)
     return user
 
-# 2-1. 정지 해제(관리자 기능 필요시)
+# 2-1. 정지 해제 + 신고 카운트 초기화
 def unban_user(db: Session, user_id: int):
     user = db.query(User).filter(User.user_id == user_id).first()
     if user and user.is_banned:
         user.is_banned = False
         db.commit()
         db.refresh(user)
+        # 신고 무효화 (is_approved=True였던 걸 모두 False로 바꿈)
+        db.query(CheatReport).filter(
+            CheatReport.reported_user_id == user_id,
+            CheatReport.is_approved == True
+        ).update({"is_approved": False})
+        db.commit()
     return user
 
 
@@ -88,7 +94,7 @@ def get_user_match_history(db: Session, user_id: int):
 def get_all_match_logs(db: Session):
     return db.query(MatchLog).all()
 
-# 11. [중요] 자동 영구 정지: 승인된 신고가 3초과일 때 is_banned 처리
+# 11. 자동 영구 정지: 승인된 신고가 3초과일 때 is_banned 처리
 def auto_ban_user_if_needed(db: Session, user_id: int, threshold: int = 3):
     count = db.query(CheatReport).filter(
         CheatReport.reported_user_id == user_id,
@@ -101,3 +107,26 @@ def auto_ban_user_if_needed(db: Session, user_id: int, threshold: int = 3):
         db.refresh(user)
         return True
     return False
+
+# 12. 전체 유저 + 각 유저별 신고당한 횟수(report_count) 조회
+def get_all_users_with_report_count(db: Session):
+    from sqlalchemy.sql import func
+
+    subq = (
+        db.query(
+            CheatReport.reported_user_id.label("user_id"),
+            func.count(CheatReport.report_id).label("report_count")
+        )
+        .group_by(CheatReport.reported_user_id)
+        .subquery()
+    )
+
+    result = (
+        db.query(
+            User,
+            func.coalesce(subq.c.report_count, 0).label("report_count")
+        )
+        .outerjoin(subq, User.user_id == subq.c.user_id)
+        .all()
+    )
+    return result
