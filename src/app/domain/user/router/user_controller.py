@@ -9,7 +9,7 @@ from src.app.domain.user.schemas import user_schemas as schemas
 from src.app.domain.user.service import user_service as service
 from src.app.models.models import User
 from src.app.utils.logging import logger
-
+from src.app.utils.s3_utils import get_s3_public_url, PROFILE_IMAGE_BUCKET
 router = APIRouter()
 
 
@@ -30,6 +30,11 @@ async def get_user_me(
         user_dict["user_mmr"] = int(mmr)
         user_dict["user_rank"] = int(user_rank)
         user_dict["role"] = user.role.value if hasattr(user.role, "value") else str(user.role)
+
+        # ✅ profile 이미지 URL 절대경로로 변환
+        if user_dict.get("profile_img_url") and not user_dict["profile_img_url"].startswith("http"):
+            user_dict["profile_img_url"] = get_s3_public_url(PROFILE_IMAGE_BUCKET, user_dict["profile_img_url"])
+
         logger.info(f"Successfully fetched profile for user ID: {current_user.user_id}")
         return schemas.UserResponseDto(**user_dict)
 
@@ -79,6 +84,10 @@ async def update_my_profile_handler(
         "user_rank": int(rank),
         "role": updated_user.role.value if hasattr(updated_user.role, "value") else str(updated_user.role),
     }
+
+    # ✅ profile 이미지 URL 절대경로로 변환
+    if user_dict.get("profile_img_url") and not user_dict["profile_img_url"].startswith("http"):
+        user_dict["profile_img_url"] = get_s3_public_url(PROFILE_IMAGE_BUCKET, user_dict["profile_img_url"])
 
     return schemas.UserUpdateResponse(
         message="회원 정보가 성공적으로 수정되었습니다.",
