@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import Optional
 from datetime import datetime
 from src.app.models.models import AchievementTriggerType, RewardType
@@ -14,7 +14,7 @@ class AdminUserOut(BaseModel):
     created_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 # 2. 신고(Report) 응답 스키마
@@ -27,7 +27,7 @@ class AdminReportOut(BaseModel):
     created_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 # 3. 문제(Problem) 응답 스키마
@@ -39,7 +39,7 @@ class AdminProblemOut(BaseModel):
     created_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 # 4. 티어(또는 MMR) 분포 스키마
@@ -48,7 +48,7 @@ class TierDistributionItem(BaseModel):
     user_count: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 # 5. 영구정지/해제 결과 등 단일 결과 응답
@@ -76,6 +76,14 @@ class AchievementBase(BaseModel):
     reward_type: RewardType = Field(RewardType.BADGE, description="보상 타입")
     reward_amount: int = Field(1, description="보상 량")
 
+    @classmethod
+    def validate_enums(cls, values):
+        if 'trigger_type' in values and isinstance(values['trigger_type'], str):
+            values['trigger_type'] = AchievementTriggerType(values['trigger_type'])
+        if 'reward_type' in values and isinstance(values['reward_type'], str):
+            values['reward_type'] = RewardType(values['reward_type'])
+        return values
+
 
 class AchievementCreate(AchievementBase):
     pass
@@ -91,4 +99,4 @@ class AchievementResponse(AchievementBase):
     updated_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True

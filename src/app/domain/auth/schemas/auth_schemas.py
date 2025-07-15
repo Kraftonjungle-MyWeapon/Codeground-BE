@@ -1,6 +1,7 @@
 from typing import Optional
 from pydantic import BaseModel, constr, EmailStr
 from src.app.config.config import settings
+from datetime import datetime
 
 
 class SignupRequest(BaseModel):
@@ -30,6 +31,8 @@ class LoginUserDto(BaseModel):
     email: str
     username: str
     nickname: str
+    last_login_at: Optional[datetime] = None
+    consecutive_login_days: int
 
     model_config = {"from_attributes": True}
 

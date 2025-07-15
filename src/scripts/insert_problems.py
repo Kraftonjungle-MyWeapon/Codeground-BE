@@ -38,7 +38,7 @@ json_files = [
     "data/prob-gold.json",
     "data/prob-diamond.json",
     "data/prob-platinum.json",
-    "data/prob-challenger.json"
+    "data/prob-challenger.json",
 ]
 
 for f in json_files:

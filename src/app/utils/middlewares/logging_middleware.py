@@ -41,7 +41,6 @@ def sanitize_data(data, content_type):
         return data
 
 
-
 def sanitize_dict(data_dict):
     if not isinstance(data_dict, dict):
         return data_dict
@@ -146,9 +145,7 @@ async def log_requests(request: Request, call_next):
 
     res_content_type = response.headers.get("Content-Type", "")
     log_level = (
-        "info" if 200 <= response.status_code < 300
-        else "warning" if 400 <= response.status_code < 500
-        else "error"
+        "info" if 200 <= response.status_code < 300 else "warning" if 400 <= response.status_code < 500 else "error"
     )
 
     task = BackgroundTask(

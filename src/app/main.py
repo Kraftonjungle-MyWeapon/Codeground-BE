@@ -80,13 +80,13 @@ app.add_middleware(
     allow_headers=["*"],  # 모든 헤더 허용 (필요한 헤더만 설정해도 좋음)
 )
 
+app.include_router(router=achievement_router, prefix=settings.API_V1_STR)
 app.include_router(router=auth_router, prefix=settings.API_V1_STR)
 app.include_router(router=github_router, prefix=settings.API_V1_STR)  # ✅ 명확히 분리
 app.include_router(router=webrtc_router, prefix=settings.API_V1_STR)
 app.include_router(router=match_router, prefix=settings.API_V1_STR)
 app.include_router(router=user_router, prefix=settings.API_V1_STR)
 app.include_router(router=game_router, prefix=settings.API_V1_STR)
-app.include_router(router=achievement_router, prefix=settings.API_V1_STR)
 app.include_router(router=ranking_router, prefix=settings.API_V1_STR)
 app.include_router(router=analysis_router, prefix=settings.API_V1_STR)
 app.include_router(router=report_router, prefix=settings.API_V1_STR)

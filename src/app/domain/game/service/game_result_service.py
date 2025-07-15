@@ -85,11 +85,7 @@ async def update_user_mmr(db: Session, game_id: int, user_id: int) -> None:
         user_rank.rank = update_users[-1].rank
         user_rank.rank_diff = ori_rank - user_rank.rank
 
-        start = (
-            ori_rank
-            if user_rank.rank > high_user_cnt
-            else high_user_cnt + 1
-        )
+        start = ori_rank if user_rank.rank > high_user_cnt else high_user_cnt + 1
         for user in update_users:
             if user == user_rank or user.rank < ori_rank:
                 continue
@@ -100,11 +96,7 @@ async def update_user_mmr(db: Session, game_id: int, user_id: int) -> None:
     # 승리 시
     else:
         ori_rank = user_rank.rank
-        user_rank.rank = (
-            update_users[0].rank
-            if update_users[0].rank > high_user_cnt
-            else high_user_cnt + 1
-        )
+        user_rank.rank = update_users[0].rank if update_users[0].rank > high_user_cnt else high_user_cnt + 1
         user_rank.rank_diff = ori_rank - user_rank.rank
 
         start = user_rank.rank + 1
@@ -123,11 +115,11 @@ from src.app.models.models import AchievementTriggerType
 
 
 async def update_user_log(
-        db: Session,
-        game_id: int,
-        user_id: int,
-        opponent_id: int,
-        winner_id: int | None,
+    db: Session,
+    game_id: int,
+    user_id: int,
+    opponent_id: int,
+    winner_id: int | None,
 ) -> None:
     # MatchLog 가져오기
     user_log = await get_log_by_game_id(db, game_id, user_id)
@@ -153,6 +145,7 @@ async def update_user_log(
     await update_user_mmr(db, game_id, opponent_id)
 
     # 업적 확인 로직
+    # 1. 게임 결과에 따른 업적 처리
     user_ids = [user_id, opponent_id]
     for u_id in user_ids:
         await achievement_service.handle_achievement_event(db, u_id, AchievementTriggerType.TOTAL_WIN)
@@ -160,6 +153,47 @@ async def update_user_log(
         await achievement_service.handle_achievement_event(db, u_id, AchievementTriggerType.TOTAL_DRAW)
         await achievement_service.handle_achievement_event(db, u_id, AchievementTriggerType.CONSECUTIVE_WIN)
         await achievement_service.handle_achievement_event(db, u_id, AchievementTriggerType.CONSECUTIVE_LOSS)
+
+    # 2. 푼 문제 수, N번 안에 풀기, 오답 없이 승리 업적 처리 (승자에게만)
+    if user_log.result == MatchResult.WIN:
+        await achievement_service.handle_achievement_event(db, user_id, AchievementTriggerType.PROBLEM_SOLVED)
+        await achievement_service.handle_achievement_event(
+            db, user_id, AchievementTriggerType.WIN_WITHIN_N_SUBMISSIONS, submission_count=user_log.submission_count
+        )
+        await achievement_service.handle_achievement_event(
+            db,
+            user_id,
+            AchievementTriggerType.FIRST_WIN,
+        )
+        await achievement_service.handle_achievement_event(
+            db, user_id, AchievementTriggerType.WIN_WITHOUT_MISS, submission_count=user_log.submission_count
+        )
+    elif opponent_log.result == MatchResult.WIN:
+        await achievement_service.handle_achievement_event(db, opponent_id, AchievementTriggerType.PROBLEM_SOLVED)
+        await achievement_service.handle_achievement_event(
+            db,
+            opponent_id,
+            AchievementTriggerType.WIN_WITHIN_N_SUBMISSIONS,
+            submission_count=opponent_log.submission_count,
+        )
+        await achievement_service.handle_achievement_event(
+            db,
+            opponent_id,
+            AchievementTriggerType.FIRST_WIN,
+        )
+        await achievement_service.handle_achievement_event(
+            db, opponent_id, AchievementTriggerType.WIN_WITHOUT_MISS, submission_count=opponent_log.submission_count
+        )
+
+    # 3. 빨리 풀기 업적 처리 (승자에게만)
+    if user_log.result == MatchResult.WIN:
+        await achievement_service.handle_achievement_event(
+            db, user_id, AchievementTriggerType.FAST_WIN, match_id=game_id
+        )
+    elif opponent_log.result == MatchResult.WIN:
+        await achievement_service.handle_achievement_event(
+            db, opponent_id, AchievementTriggerType.FAST_WIN, match_id=game_id
+        )
 
     return
 

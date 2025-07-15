@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from src.app.models.models import User, UserMmr, UserRole
 from src.app.domain.auth.schemas import auth_schemas as schemas
 from typing import Optional
+from datetime import datetime
 
 
 def get_user_by_email(db: Session, email: str) -> Optional[User]:
@@ -58,3 +59,12 @@ def create_social_user(db: Session, user_data: schemas.SocialSignupRequest) -> U
     db.refresh(new_user)
 
     return new_user
+
+
+def update_user_login_info(db: Session, user: User, last_login_at: datetime, consecutive_login_days: int) -> User:
+    user.last_login_at = last_login_at
+    user.consecutive_login_days = consecutive_login_days
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user

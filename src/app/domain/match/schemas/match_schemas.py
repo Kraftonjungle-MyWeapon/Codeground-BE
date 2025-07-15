@@ -15,13 +15,12 @@ class MatchingUserInfo:
 
 class MatchLogSchema(BaseModel):
     result: Optional[MatchResult]
-    opponent_name : str
+    opponent_name: str
     mmr_earned: int
     opponent_tier: str
-    game_difficulty : ProblemDifficultyByTiers
-    game_time : datetime
-    game_title : str
+    game_difficulty: ProblemDifficultyByTiers
+    game_time: datetime
+    game_title: str
 
     class Config:
         from_attributes = True
-        use_enum_values = True

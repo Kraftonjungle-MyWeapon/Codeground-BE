@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from src.app.models.models import User, CheatReport, Problem, MatchLog, Match, Ranking, UserMmr
+from src.app.models.models import User, CheatReport, Problem, MatchLog, UserMmr
 
 from src.app.models.models import Achievement
 from src.app.domain.admin.schemas.admin_schemas import AchievementCreate, AchievementUpdate
@@ -81,11 +81,7 @@ def delete_problem(db: Session, problem_id: int):
 def get_tier_distribution(db: Session):
     # 티어는 UserMmr.rating, 혹은 User 테이블에 별도 컬럼이 있으면 그걸 사용
     # 예시: 티어 산정 기준을 함수로 따로 만들 수도 있음
-    tier_counts = (
-        db.query(UserMmr.rating, func.count(UserMmr.user_id))
-        .group_by(UserMmr.rating)
-        .all()
-    )
+    tier_counts = db.query(UserMmr.rating, func.count(UserMmr.user_id)).group_by(UserMmr.rating).all()
     # 실제 서비스에서는 rating 구간별("bronze" 등)로 매핑하는 로직이 필요함
     return tier_counts
 
@@ -103,10 +99,9 @@ def get_all_match_logs(db: Session):
 # 11. [중요] 자동 영구 정지: 승인된 신고가 3초과일 때 is_banned 처리
 # 11. 자동 영구 정지: 승인된 신고가 3초과일 때 is_banned 처리
 def auto_ban_user_if_needed(db: Session, user_id: int, threshold: int = 3):
-    count = db.query(CheatReport).filter(
-        CheatReport.reported_user_id == user_id,
-        CheatReport.is_confirmed == True
-    ).count()
+    count = (
+        db.query(CheatReport).filter(CheatReport.reported_user_id == user_id, CheatReport.is_confirmed is True).count()
+    )
     user = db.query(User).filter(User.user_id == user_id).first()
     if user and count > threshold and not user.is_banned:
         user.is_banned = True

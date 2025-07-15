@@ -34,7 +34,7 @@ def sign_s3_url(key: str, ttl: int) -> str:
             Params={"Bucket": PROBLEM_BUCKET, "Key": key},
             ExpiresIn=ttl,
         )
-    except Exception as e:
+    except Exception:
         pass
         # raise RuntimeError(f"Presigned URL 생성 실패: {key}, 에러: {e}")
 
@@ -42,7 +42,7 @@ def sign_s3_url(key: str, ttl: int) -> str:
 def upload_bytes(data: bytes, key: str, bucket: str = REPORT_BUCKET) -> None:
     try:
         s3.put_object(Bucket=bucket, Key=key, Body=data)
-    except Exception as e:
+    except Exception:
         pass
         # raise RuntimeError(f"S3 업로드 실패: {key}, 에러: {e}")
 
@@ -51,13 +51,14 @@ def get_s3_public_url(bucket: str, key: str) -> str:
     """Constructs the public URL for an S3 object."""
     return f"https://{bucket}.s3.{REGION}.amazonaws.com/{key}"
 
+
 async def upload_image_to_s3_and_get_url(file_bytes: bytes, key: str, bucket: str) -> str:
     """Uploads image bytes to S3 and returns its public URL."""
     try:
         s3.put_object(Bucket=bucket, Key=key, Body=file_bytes)
         return get_s3_public_url(bucket, key)
-    except Exception as e:
-        raise RuntimeError(f"Failed to upload image to S3: {e}")
+    except Exception:
+        raise RuntimeError("Failed to upload image to S3")
 
 
 async def upload_profile_image_to_s3(file: UploadFile) -> str:
@@ -76,8 +77,8 @@ async def upload_profile_image_to_s3(file: UploadFile) -> str:
 
         # ✅ 퍼블릭 URL 생성 후 반환
         return get_s3_public_url(PROFILE_IMAGE_BUCKET, s3_key)
-    except Exception as e:
-        raise RuntimeError(f"Failed to upload profile image to S3: {e}")
+    except Exception:
+        raise RuntimeError("Failed to upload profile image to S3")
 
 
 async def issue_problem_urls(problem: Problem) -> ProblemURLBundle:
@@ -86,7 +87,8 @@ async def issue_problem_urls(problem: Problem) -> ProblemURLBundle:
         # raise ValueError("Problem 객체가 없습니다")
 
     print(
-        f"[DEBUG] issue_problem_urls: problem_id={problem.problem_id}, body_key={problem.body_key}, image_keys={problem.image_keys}")
+        f"[DEBUG] issue_problem_urls: problem_id={problem.problem_id}, body_key={problem.body_key}, image_keys={problem.image_keys}"
+    )
 
     # 문제 본문 URL 생성
     problem_url = sign_s3_url(problem.body_key, ttl=ENDTIMER)
@@ -98,13 +100,10 @@ async def issue_problem_urls(problem: Problem) -> ProblemURLBundle:
             try:
                 image_url = sign_s3_url(key, ttl=ENDTIMER)
                 image_urls.append(image_url)
-            except Exception as e:
+            except Exception:
                 pass
             #     print(f"[WARNING] presigned URL 생성 실패 (image key: {key}): {e}")
     else:
         print(f"[DEBUG] 문제 {problem.problem_id}에 이미지가 없습니다.")
 
-    return {
-        "problem_url": problem_url,
-        "image_urls": image_urls
-    }
+    return {"problem_url": problem_url, "image_urls": image_urls}

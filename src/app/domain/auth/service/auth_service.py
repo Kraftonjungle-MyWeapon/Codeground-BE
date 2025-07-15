@@ -8,6 +8,8 @@ from src.app.domain.auth.schemas import auth_schemas as schemas
 from src.app.core.password import get_password_hash, verify_password
 from src.app.utils.email import send_email
 from src.app.utils.logging import logger
+from src.app.domain.achievement.service import achievement_service
+from src.app.models.models import AchievementTriggerType
 
 reset_code_store = {}
 
@@ -66,6 +68,37 @@ async def authenticate_user(db: Session, email: str, password: str) -> schemas.L
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="이메일 또는 비밀번호가 올바르지 않습니다.",
         )
+
+    
+
+    # 로그인 정보 업데이트 및 업적 확인
+    today = datetime.now(timezone.utc).date()
+    last_login_date = user.last_login_at.date() if user.last_login_at else None
+
+    if last_login_date == today:
+        # 같은 날 재로그인 시 연속 로그인 유지
+        pass
+    elif last_login_date == today - timedelta(days=1):
+        # 어제 로그인했으면 연속 로그인 증가
+        user.consecutive_login_days += 1
+    else:
+        # 연속 로그인 끊김
+        user.consecutive_login_days = 1
+
+    user.last_login_at = datetime.now(timezone.utc)
+    crud.update_user_login_info(db, user, user.last_login_at, user.consecutive_login_days)
+
+    # 업적 확인
+    await achievement_service.handle_achievement_event(
+        db, user.user_id, AchievementTriggerType.CONSECUTIVE_LOGIN, current_value=user.consecutive_login_days
+    )
+    await achievement_service.handle_achievement_event(
+        db,
+        user.user_id,
+        AchievementTriggerType.LOGIN_ON_DAY_OF_WEEK,
+        current_value=datetime.now(timezone.utc).weekday(),  # 월요일=0, 일요일=6
+    )
+
     logger.info(f"User {email} authenticated successfully")
     return schemas.LoginUserDto.model_validate(user)
 

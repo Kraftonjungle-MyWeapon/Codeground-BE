@@ -24,7 +24,7 @@ async def get_user_me(
         user = await service.get_user_data(db, current_user.user_id)
         user_mmr = await get_mmr_by_id(db, user.user_id)
         mmr = user_mmr.rating if user_mmr.rating else 1000
-        user_rank_info = await  get_rank_by_id(db, user.user_id)
+        user_rank_info = await get_rank_by_id(db, user.user_id)
         user_rank = user_rank_info.rank if user_rank_info else 00
         user_dict = user.model_dump()
         user_dict["user_mmr"] = int(mmr)

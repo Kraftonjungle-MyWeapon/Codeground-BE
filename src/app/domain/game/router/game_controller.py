@@ -193,13 +193,16 @@ async def handle_game_message(db, websocket: WebSocket, game_id: int, user_id: i
                 await start_game_timer(game_id)
 
         elif message_type == "system_warning":
-            await broadcast_to_room(game_id, {
-                "type": "system_warning",
-                "event": data.get("event"),
-                "count": data.get("count"),
-                "message": data.get("message"),
-                "user_id": user_id,  # 누가 보낸 건지 구분용
-            })
+            await broadcast_to_room(
+                game_id,
+                {
+                    "type": "system_warning",
+                    "event": data.get("event"),
+                    "count": data.get("count"),
+                    "message": data.get("message"),
+                    "user_id": user_id,  # 누가 보낸 건지 구분용
+                },
+            )
 
         elif message_type == "screen_share_stopped":
             logger.info(f"Screen share stopped by user {user_id} in game {game_id}")
@@ -233,7 +236,7 @@ async def handle_game_message(db, websocket: WebSocket, game_id: int, user_id: i
                     "user_id": user_id,
                     "message": "상대방이 화면 공유 재협상을 요청했습니다.",
                 },
-                exclude=websocket
+                exclude=websocket,
             )
 
         elif message_type == "pause_timer":
@@ -313,24 +316,28 @@ async def process_match_result(db: Session, game_id: int, user_id: int, opponent
     return await broadcast_result(db, game_id, user_id, opponent_id, winner_id, reason)
 
 
-async def broadcast_result(db: Session, game_id: int, user_id: int, opponent_id: int, winner_id: int | None,
-                           reason: str | None) -> None:
+async def broadcast_result(
+    db: Session, game_id: int, user_id: int, opponent_id: int, winner_id: int | None, reason: str | None
+) -> None:
     if reason:
         user_earned = await get_mmr_earned(db, game_id, user_id)
         opponent_earned = await get_mmr_earned(db, game_id, opponent_id)
-        await broadcast_to_room(game_id, {
-            "type": "match_result",
-            "winner": winner_id,
-            "plus_mmr": max(user_earned, opponent_earned),
-            "minus_mmr": min(user_earned, opponent_earned),
-            "reason": reason
-        })
+        await broadcast_to_room(
+            game_id,
+            {
+                "type": "match_result",
+                "winner": winner_id,
+                "plus_mmr": max(user_earned, opponent_earned),
+                "minus_mmr": min(user_earned, opponent_earned),
+                "reason": reason,
+            },
+        )
     else:
         return
 
 
 # 로컬용
-tiers = ['bronze', 'silver', 'gold', 'platinum', 'diamond']
+tiers = ["bronze", "silver", "gold", "platinum", "diamond"]
 
 ROOT_DIR = Path(__file__).resolve().parents[5]
 

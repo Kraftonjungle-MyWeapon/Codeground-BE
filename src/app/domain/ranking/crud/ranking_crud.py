@@ -17,10 +17,12 @@ def get_users_by_language(db: Session, language: str) -> List[Any]:
 
 # 해당 유저의 순위 및 순위 차이 갱신
 def update_user_rank(db: Session, ranking_id: int, new_rank: int, rank_diff: int):
-    db.query(Ranking).filter(Ranking.ranking_id == ranking_id).update({
-        Ranking.rank: new_rank,
-        Ranking.rank_diff: rank_diff,
-    })
+    db.query(Ranking).filter(Ranking.ranking_id == ranking_id).update(
+        {
+            Ranking.rank: new_rank,
+            Ranking.rank_diff: rank_diff,
+        }
+    )
 
 
 # 순위 변화 기록 삽입
@@ -43,9 +45,15 @@ def insert_rank_change_log(
 async def get_rank_by_id(db: Session, user_id: int) -> type[Ranking] | None:
     return db.query(Ranking).filter(Ranking.user_id == user_id).first()
 
+
 async def get_all_users_mmr(db: Session) -> list[InstrumentedAttribute]:
     return db.query(Ranking.mmr).all()
 
 
 async def get_users_in_mmr_range(db: Session, min_mmr: float, max_mmr: float) -> list[type[Ranking]]:
-    return db.query(Ranking).filter(Ranking.mmr.between(min_mmr, max_mmr)).order_by(Ranking.mmr.desc(),Ranking.rank.asc()).all()
+    return (
+        db.query(Ranking)
+        .filter(Ranking.mmr.between(min_mmr, max_mmr))
+        .order_by(Ranking.mmr.desc(), Ranking.rank.asc())
+        .all()
+    )

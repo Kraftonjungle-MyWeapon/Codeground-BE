@@ -1,8 +1,9 @@
-from pydantic import BaseModel, EmailStr, HttpUrl, ConfigDict, model_validator
+from pydantic import BaseModel, EmailStr, ConfigDict, model_validator
 from typing import Optional
 from datetime import datetime
 from fastapi import HTTPException
 from src.app.utils.s3_utils import get_s3_public_url, PROFILE_IMAGE_BUCKET
+
 
 # ✅ MMR 상세 표현용
 class MyMmr(BaseModel):
@@ -32,7 +33,8 @@ class UserResponseDto(BaseModel):
     role: str
     use_lang: str
     user_mmr: int
-    user_rank : int
+    user_rank: int
+    model_config = {"from_attributes": True}
     profile_img_url: Optional[str] = None
 
     model_config = {"from_attributes": True}
@@ -132,7 +134,6 @@ class UserDto(BaseModel):
             values["profile_img_url"] = get_s3_public_url(PROFILE_IMAGE_BUCKET, raw_profile)
 
         return values
-
 
 
 # ✅ 최근 경기 기록용

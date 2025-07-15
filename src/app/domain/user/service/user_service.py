@@ -7,6 +7,7 @@ from src.app.utils.logging import logger
 from src.app.utils.s3_utils import PROFILE_IMAGE_BUCKET, s3
 import uuid
 
+
 async def get_user_data(db: Session, input_id: int) -> schemas.UserDto:
     logger.info(f"Attempting to retrieve user data for ID: {input_id}")
     user = crud.get_user_by_id(db, input_id=input_id)

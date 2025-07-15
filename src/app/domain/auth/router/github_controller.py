@@ -1,6 +1,6 @@
 from typing import Annotated
-from fastapi import APIRouter, Depends, Response, Query
-from fastapi.responses import RedirectResponse, JSONResponse
+from fastapi import APIRouter, Depends, Query
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from src.app.core.database import get_db
@@ -21,7 +21,10 @@ async def github_login():
 
 
 @router.get("/callback")
-async def github_callback(code: Annotated[str, Query()], db: Annotated[DB, Depends(get_db)],):
+async def github_callback(
+    code: Annotated[str, Query()],
+    db: Annotated[DB, Depends(get_db)],
+):
     result = await handle_github_callback(code, db)
 
     if isinstance(result, RedirectResponse):
@@ -32,8 +35,7 @@ async def github_callback(code: Annotated[str, Query()], db: Annotated[DB, Depen
 
     # ✅ 프론트엔드로 리디렉션
     response = RedirectResponse(
-        url=f"{settings.FRONTEND_REDIRECT_URL}?is_new_user={str(is_new_user).lower()}",
-        status_code=302
+        url=f"{settings.FRONTEND_REDIRECT_URL}?is_new_user={str(is_new_user).lower()}", status_code=302
     )
 
     # ✅ 쿠키 설정

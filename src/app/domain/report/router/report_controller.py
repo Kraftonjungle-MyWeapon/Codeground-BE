@@ -8,12 +8,12 @@ router = APIRouter()
 
 @router.post("/", status_code=201)
 async def create_report(
-        game_id: int | None = Form(None),
-        reason: str = Form(...),
-        description: str = Form(...),
-        video: UploadFile = File(...),
-        reported_user_id: int = Form(...),
-        db: Session = Depends(get_db),
+    game_id: int | None = Form(None),
+    reason: str = Form(...),
+    description: str = Form(...),
+    video: UploadFile = File(...),
+    reported_user_id: int = Form(...),
+    db: Session = Depends(get_db),
 ):
     await service.save_report(db, game_id, reason, description, video, reported_user_id)
     return {"message": "Report received"}

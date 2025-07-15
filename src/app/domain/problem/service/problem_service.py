@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import json
-import uuid
-import re
 from pathlib import Path
 from typing import List, Optional
 
@@ -22,9 +20,9 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 
 async def save_problem(
-        db: Session,
-        problem_data: ProblemCreateRequest,
-        images: Optional[List[UploadFile]] = None,
+    db: Session,
+    problem_data: ProblemCreateRequest,
+    images: Optional[List[UploadFile]] = None,
 ) -> Problem:
     # Create a new problem instance without the body_key first
     new_problem = Problem(

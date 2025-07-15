@@ -28,7 +28,7 @@ class MatchService:
 
     async def _run(self):
         logger.info("Match service _run loop started.")
-        #티어 카운트 최신화
+        # 티어 카운트 최신화
         with next(get_db()) as db:
             await refresh_tier_cnt(db)
             logger.info("Tier dic func successed")

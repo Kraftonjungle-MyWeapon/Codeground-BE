@@ -14,12 +14,7 @@ REPORT_DIR.mkdir(parents=True, exist_ok=True)
 
 
 async def save_report(
-    db: Session,
-    game_id: int | None,
-    reason: str,
-    description: str,
-    video: UploadFile,
-    reported_user_id: int
+    db: Session, game_id: int | None, reason: str, description: str, video: UploadFile, reported_user_id: int
 ) -> None:
     file_name = f"{uuid.uuid4()}.webm"
     env = (getattr(settings, "ENV", None) or getattr(settings, "ENVIRONMENT", None) or "local").lower()

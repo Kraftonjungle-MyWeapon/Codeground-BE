@@ -2,7 +2,6 @@ import math
 from enum import Enum
 from typing import List, Tuple
 
-
 # Glicko2 기반 상수/파라미터
 SCALE = 173.7178
 SIGMA_DEF = 0.1

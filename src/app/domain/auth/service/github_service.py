@@ -79,11 +79,13 @@ async def handle_github_callback(code: str, db: Session):
         # ✅ 5. 이메일 중복 계정이 있을 경우 오류 반환
         existing_user = crud.get_user_by_email(db, email)
         if existing_user:
-            query_params = urlencode({
-                "message": (
-                    "이미 가입된 이메일로 등록된 계정이 있습니다. 일반 로그인 또는 다른 GitHub 계정을 사용해주세요."
-                )
-            })
+            query_params = urlencode(
+                {
+                    "message": (
+                        "이미 가입된 이메일로 등록된 계정이 있습니다. 일반 로그인 또는 다른 GitHub 계정을 사용해주세요."
+                    )
+                }
+            )
             return RedirectResponse(
                 url=f"{settings.FRONTEND_REDIRECT_URL.replace('/oauth/callback', '/login')}?{query_params}",
                 status_code=302,

@@ -6,6 +6,7 @@ from sqlalchemy import select
 
 LOGS_PER_CLICK = 15
 
+
 async def get_mmr_by_id(db: Session, user_id: int) -> Optional[UserMmr]:  # User -> Optional[User]로 수정
     return db.query(UserMmr).filter(UserMmr.user_id == user_id).first()
 
@@ -33,9 +34,9 @@ async def create_match_logs(db: Session, match_id: int, user_ids: list[int], pro
     user_a_log = MatchLog(
         match_id=match_id,
         problem_id=problem_id,
-        user_id= user_ids[0],
+        user_id=user_ids[0],
         is_consumed=False,
-        opponent_id = user_b_mmr.user_id,
+        opponent_id=user_b_mmr.user_id,
         opponent_mmr=user_b_mmr.rating,
         opponent_rd=user_b_mmr.rating_devi,
     )
@@ -55,11 +56,19 @@ async def create_match_logs(db: Session, match_id: int, user_ids: list[int], pro
     db.commit()
     return
 
+
 async def get_match_log_by_user_index(db: Session, user_id: int, index: int) -> Sequence[MatchLog]:
     start = index * LOGS_PER_CLICK
-    stmt = (select(MatchLog).where(MatchLog.user_id == user_id).order_by(MatchLog.created_at.desc()).offset(start).limit(LOGS_PER_CLICK))
+    stmt = (
+        select(MatchLog)
+        .where(MatchLog.user_id == user_id)
+        .order_by(MatchLog.created_at.desc())
+        .offset(start)
+        .limit(LOGS_PER_CLICK)
+    )
     result = db.execute(stmt)
     return result.scalars().all()
+
 
 def get_body_key_from_match_id(db: Session, match_id: int) -> str:
     # match_id로부터 body_key를 가져오는 함수

@@ -71,7 +71,7 @@ def configure_logging():
             log_file_path = log_dir / log_file_name
             file_handler = RotatingFileHandler(log_file_path, maxBytes=1024 * 1024 * 5, backupCount=5)  # 5MB 파일 5개
             file_handler.setFormatter(formatter)
-            file_handler.setLevel(logging.DEBUG) # Local environment should log all debug messages to file
+            file_handler.setLevel(logging.DEBUG)  # Local environment should log all debug messages to file
             loggers.addHandler(file_handler)
 
         return loggers
