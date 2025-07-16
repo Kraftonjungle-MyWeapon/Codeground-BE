@@ -24,7 +24,7 @@ from src.app.domain.ranking.router.ranking_controller import router as ranking_r
 from src.app.domain.auth.router.github_controller import router as github_router
 from src.app.domain.ranking.service.ranking_scheduler import start_ranking_scheduler
 from src.app.domain.admin.router.admin_controller import router as admin_router
-
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from src.app.utils.middlewares.domain_limiter import DomainLimiterMiddleware
 
 logger = logger
@@ -65,6 +65,22 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         status_code=400,
         content={"detail": exc.errors(), "body": decoded_body},
     )
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+    )
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled error: {exc}", extra={"url": str(request.url)})
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal Server Error"},
+    )
+
 
 
 # 미들웨어 등록
