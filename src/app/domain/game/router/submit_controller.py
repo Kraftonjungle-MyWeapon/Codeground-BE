@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from src.app.core.database import get_db
 from src.app.core.security import get_current_user
 from src.app.models.models import User
-from src.app.domain.match.crud.match_crud import get_body_key_from_match_id
+from src.app.domain.match.crud.match_crud import get_body_key_from_problem_id
 from src.app.utils.logging import logger
 
 router = APIRouter()
@@ -23,14 +23,13 @@ async def submit_code(
     # 코드에서 위 값(should_exit_event)을 명시적으로 None으로 리셋하는 이유는, 이전에 남아있던 종료 플래그를 초기화함으로써 새로운 SSE 세션에 영향이 없도록 하기 위함임.
 
     # match_crud.py로부터 problem_id를 가져옴.
-    event_generator = service.stream_evaluate_code(
-        db,
-        current_user.user_id,
-        request.match_id,
-        request.language,
-        request.code,
-        get_body_key_from_match_id(db, request.match_id),
-    )
+    event_generator = service.stream_evaluate_code(db,
+                                                   current_user.user_id,
+                                                   request.match_id,
+                                                   request.language,
+                                                   request.code,
+                                                   request.is_public,
+                                                   get_body_key_from_problem_id(db, int(request.problem_id)))
 
     logger.info(f"POST /submit - {event_generator}")
     return EventSourceResponse(event_generator)
@@ -43,9 +42,10 @@ async def submit_code_public(request: schemas.SubmitRequest, db: Session = Depen
     """
 
     # match_crud.py로부터 problem_id를 가져옴.
+
     AppStatus.should_exit_event = None
     event_generator = service.stream_evaluate_code_public(
-        request.language, request.code, get_body_key_from_match_id(db, request.match_id)
+        request.language, request.code, get_body_key_from_problem_id(db, int(request.problem_id))
     )
 
     logger.info(f"POST /submit_public - {event_generator}")

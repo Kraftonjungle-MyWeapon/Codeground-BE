@@ -17,3 +17,9 @@ end_times: Dict[int, float] = {}
 is_paused: Dict[int, bool] = defaultdict(lambda: False)
 remaining_time_on_pause: Dict[int, float] = {}
 timer_tasks: Dict[int, asyncio.Task] = {}
+
+disconnected_users = {}
+
+
+custom_game_rooms : Dict[int, List[WebSocket]] = defaultdict(list)
+room_listenner_tasks: Dict[int, List[asyncio.Task]] = defaultdict(list)

@@ -25,3 +25,23 @@ class ProblemCreateRequest(BaseModel):
 
 class ProblemCreateResponse(BaseModel):
     problem_id: int
+
+
+CATEGORY_INDEX_TO_NAME = [
+    "implementation",
+    "simulation",
+    "dp",
+    "greedy",
+    "stack",
+    "queue",
+    "string",
+    "math",
+    "geometry",
+    "sorting",
+    "binary-search",
+    "parametric-search",
+    "graph",
+    "dfs",
+    "bfs",
+    "shortest-path"
+]

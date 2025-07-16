@@ -69,14 +69,10 @@ async def get_match_log_by_user_index(db: Session, user_id: int, index: int) -> 
     result = db.execute(stmt)
     return result.scalars().all()
 
-
-def get_body_key_from_match_id(db: Session, match_id: int) -> str:
+def get_body_key_from_problem_id(db: Session, problem_id: int) -> str:
     # match_id로부터 body_key를 가져오는 함수
     # match 테이블에서 problem_id를 얻고, problem 테이블에서 body_key를 조회
-    match = db.query(Match).filter(Match.match_id == match_id).first()
-    if match is None:
-        raise ValueError(f"No match found with ID {match_id}")
-    problem = db.query(Problem).filter(Problem.problem_id == match.problem_id).first()
+    problem = db.query(Problem).filter(Problem.problem_id == problem_id).first()
     if problem is None:
-        raise ValueError(f"No problem found with ID {match.problem_id}")
+        raise ValueError(f"No problem found with ID {problem_id}")
     return getattr(problem, "body_key")
