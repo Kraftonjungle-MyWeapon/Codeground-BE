@@ -35,7 +35,7 @@ async def github_callback(
 
     # ✅ 프론트엔드로 리디렉션
     response = RedirectResponse(
-        url=f"{settings.FRONTEND_REDIRECT_URL}?is_new_user={str(is_new_user).lower()}", status_code=302
+        url=f"{settings.FRONTEND_REDIRECT_URL}?is_new_user={str(is_new_user).lower()}&new_access_token={access_token}", status_code=302
     )
 
     # ✅ 쿠키 설정
