@@ -20,7 +20,7 @@ class AdminUserOut(BaseModel):
 # 2. 신고(Report) 응답 스키마
 class AdminReportOut(BaseModel):
     report_id: int
-    reported_user_id: int
+    reported_user_id: Optional[int]
     reason: str
     description: Optional[str]
     is_approved: Optional[bool]
@@ -31,12 +31,37 @@ class AdminReportOut(BaseModel):
 
 
 # 3. 문제(Problem) 응답 스키마
+from src.app.models.models import ProblemDifficultyByTiers
+
 class AdminProblemOut(BaseModel):
     problem_id: int
     title: str
     difficulty: Optional[str]
     is_approved: Optional[bool]
     created_at: datetime
+    author_id: Optional[int]
+    category: list[str]
+    language: list[str]
+
+    class Config:
+        from_attributes = True
+
+# New schema for detailed problem view, including S3 URLs
+class AdminProblemDetailOut(AdminProblemOut):
+    problem_url: str
+    image_urls: list[str]
+    problem_prefix: Optional[str]
+    testcase_prefix: Optional[str]
+
+# New schema for updating a problem (DB fields)
+class AdminProblemUpdate(BaseModel):
+    title: Optional[str] = None
+    category: Optional[list[str]] = None
+    difficulty: Optional[ProblemDifficultyByTiers] = None
+    language: Optional[list[str]] = None
+    problem_prefix: Optional[str] = None
+    testcase_prefix: Optional[str] = None
+    is_approved: Optional[bool] = None
 
     class Config:
         from_attributes = True
