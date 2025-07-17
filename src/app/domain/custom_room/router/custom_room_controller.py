@@ -117,49 +117,34 @@ async def room_websocket(db: DB,websocket: WebSocket, room_id: int, user_id: int
     except WebSocketDisconnect:
         logger.info(f"WebSocket disconnected from custom_match {room_id}")
 
-        if websocket in custom_game_rooms[room.room_id]:
-            custom_game_rooms[room.room_id].remove(websocket)
-
-        room = await crud.get_room_info(room.room_id)
-        if room is None:
-            return
-
-        if room.maker.user_id != user_id and (room.user is None or user_id != room.user.user_id):
-            return
-
-        await crud.disconnect_user(room.room_id, user_id)
-        await crud.screen_share_stopped(room.room_id, user_id)
+        if websocket in custom_game_rooms.get(room_id, []):
+            custom_game_rooms[room_id].remove(websocket)
 
         async def delayed_leave():
-            await asyncio.sleep(RECONNECT_TIMEOUT)
             updated_room = await crud.get_room_info(room_id)
-            # 아직 재접속되지 않았다면 ‘완전 이탈’ 처리
             if updated_room is None:
                 return
-            (current_user, opponent) = await define_users(updated_room.room_id, user_id)
+            # 유저/상대 판별
+            (current_user, opponent) = await define_users(room_id, user_id)
             if updated_room.is_gaming:
-                logger.info(f"User {user_id} permanently left custom match {updated_room.room_id} (in-game)")
-                # 상대방에게 이탈 알림
-                await crud.process_custom_result(updated_room.room_id, opponent.user_id, "abandon")
-                # 방 정리
-                await crud.leave_from_room(updated_room.room_id, user_id)
-                await crud.end_game(updated_room.room_id)
+                # 게임 중 이탈 시
+                await asyncio.sleep(RECONNECT_TIMEOUT)
+                await crud.process_custom_result(room_id, opponent.user_id, "abandon")
+                await crud.leave_from_room(room_id, user_id)
+                await crud.end_game(room_id)
             else:
-                logger.info(f"User {user_id} left waiting room {updated_room.room_id}")
-                # 대기실에 있을 때 나간 경우 처리
-                await crud.leave_from_room(updated_room.room_id, user_id)
-                # 필요하면 상대방에게 대기실 이탈 알림도 보낼 수 있음
+                await crud.leave_from_room(room_id, user_id)
+                # 필요하면 상대에게도 알림
                 if opponent and opponent.connected:
                     await crud.publish_to_custom_room(
-                        updated_room.room_id,
+                        room_id,
                         {
                             "type": "opponent_left_waiting",
                             "user_id": user_id,
-                            "room_id": updated_room.room_id,
+                            "room_id": room_id,
                             "message": "상대방이 대기실을 떠났습니다.",
-                        }
+                        },
                     )
-
         asyncio.create_task(delayed_leave())
 
 async def handle_custom_match_message(db : Session,websocket : WebSocket, room_id : int, user_id : int , message : str):
