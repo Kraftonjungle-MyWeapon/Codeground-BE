@@ -2,9 +2,9 @@ import json
 import redis.asyncio as aioredis
 from fastapi import HTTPException
 from fastapi.encoders import jsonable_encoder
-from starlette.websockets import WebSocket
+from starlette.websockets import WebSocket, WebSocketDisconnect
 from src.app.domain.user.crud.user_crud import get_user_by_id
-from src.app.utils.game_session import custom_game_rooms, room_listenner_tasks
+from src.app.utils.game_session import custom_game_rooms, room_listenner_tasks, room_pubsubs
 from src.app.config.config import settings
 from src.app.domain.custom_room.schemas.custom_room_schema import CustomRoom, UserState, ResponseRoom
 from src.app.domain.problem.crud.problem_crud import get_random_problem_for_custom
@@ -66,35 +66,58 @@ async def join_to_room(db:Session,room_id: int, user_id: int) -> CustomRoom:
     return dict_to_custom_room(room_dict)
 
 async def leave_from_room(room_id: int, user_id: int) -> None:
+    sockets = custom_game_rooms.get(room_id, [])
+    for ws in list(sockets):
+        if getattr(ws, "user_id", None) == user_id:
+            try:
+                await ws.close()
+            except WebSocketDisconnect:
+                pass
+            sockets.remove(ws)
+            break
+
     data = await rds.get(f"room:{room_id}")
     if data is None:
         return
-    room_dict = json.loads(data)
-    maker_dict = room_dict.get("maker")
-    if maker_dict.get("user_id") == user_id:
-        remain_user_dict = room_dict.get("user")
-        if remain_user_dict is None:
-            await delete_room(room_id)
 
-        else:
-            remain_user_dict["ready"] = True
-            room_dict["maker"] = remain_user_dict
-            room_dict["user"] = None
-            await rds.set(f"room:{room_id}", json.dumps(room_dict))
-            await info_updated(room_id, "player_leave")
+    room_dict = json.loads(data)
+    maker = room_dict["maker"]
+
+    if maker.get("user_id") == user_id:
+        remain = room_dict.get("user")
+        if remain is None:
+            await delete_room(room_id)
+            return
+
+        remain["ready"] = True
+        room_dict["maker"] = remain
+        room_dict["user"] = None
+
+        await rds.set(f"room:{room_id}", json.dumps(room_dict))
+        await info_updated(room_id, "player_leave")
+
     else:
         room_dict["user"] = None
         await rds.set(f"room:{room_id}", json.dumps(room_dict))
-        await publish_to_custom_room(room_id, {"type":"player_leave","player_id":user_id})
-
-    return
+        # 퇴장 메시지만 발행
+        await publish_to_custom_room(
+            room_id,
+            {"type": "player_leave", "player_id": user_id}
+        )
 
 async def delete_room(room_id: int) -> None:
-    pubsub = rds.pubsub()
+    #방에 연결된 WebSocket 들을 미리 꺼내두기
+    sockets = custom_game_rooms.get(room_id, [])
+
+    for ws in list(sockets):
+        try:
+            await ws.close()
+        except WebSocketDisconnect:
+            pass
+
+    custom_game_rooms.pop(room_id, None)
 
     tasks = room_listenner_tasks.pop(room_id, [])
-
-    # 2) 하나씩 cancel + await, CancelledError 무시
     for task in tasks:
         task.cancel()
         try:
@@ -102,16 +125,13 @@ async def delete_room(room_id: int) -> None:
         except asyncio.CancelledError:
             pass
 
+    pubsub = rds.pubsub()
     await pubsub.unsubscribe(f"room:{room_id}")
     await rds.setbit("room_slots", room_id, 0)
     await rds.lrem("room_list", 0, str(room_id))
     await rds.delete(f"room:{room_id}")
-    for ws in custom_game_rooms[room_id]:
-        await ws.close()
 
-    custom_game_rooms[room_id] = []
-    room_listenner_tasks[room_id] = []
-    return
+    room_listenner_tasks.pop(room_id, None)
 
 async def edit_room(room_id: int, user_id: int, update_info : dict) -> CustomRoom:
     room = await get_room_info(room_id)
@@ -273,26 +293,51 @@ async def publish_to_custom_room(room_id: int, message: dict):
     await rds.publish(f"room:{room_id}", json.dumps(message))
 
 # 구독된 redis의 특정 id로부터 json을 받고 그걸 웹소캣으로 발송
-async def pubsub_listener(room_id):
+async def pubsub_listener(room_id: int):
     pubsub = rds.pubsub()
-    await pubsub.subscribe(f"room:{room_id}")
-    async for msg in pubsub.listen():
-        if msg and msg["type"] == "message":
-            # msg['data']는 bytes 또는 str임
-            raw = msg["data"]
-            if isinstance(raw, bytes):  # Redis에서 bytes로 옴
-                raw = raw.decode("utf-8")
-            data = json.loads(raw)
-            for ws in custom_game_rooms[room_id]:
-                await ws.send_json(data)
+    channel = f"room:{room_id}"
+    await pubsub.subscribe(channel)
+
+    # 인스턴스 추적
+    room_pubsubs[room_id] = pubsub
+
+    try:
+        async for msg in pubsub.listen():
+            if msg and msg["type"] == "message":
+                raw = msg["data"]
+                if isinstance(raw, bytes):
+                    raw = raw.decode()
+                data = json.loads(raw)
+
+                disconnected = []
+                for ws in set(custom_game_rooms.get(room_id, [])):
+                    try:
+                        await ws.send_json(data)
+                    except WebSocketDisconnect:
+                        disconnected.append(ws)
+
+                for ws in disconnected:
+                    custom_game_rooms[room_id].remove(ws)
+
+                if not custom_game_rooms.get(room_id):
+                    break
+
+    finally:
+        # loop 탈출 또는 예외 발생 시 클린업
+        await pubsub.unsubscribe(channel)
+        await pubsub.close()
+        room_pubsubs.pop(room_id, None)
 
 # 경기 결과 반환, 커스텀 매치라 점수 반영 X
 # reason : surrender / abandon / finish / timeover
 async def process_custom_result(room_id: int, winner_id: int | None, reason : str):
     room = await get_room_info(room_id)
-    if room.user is None:
+    if not room.is_gaming:
         return
 
+    room.is_gaming = False
+    room_dict = asdict(room)
+    await rds.set(f"room:{room_id}", json.dumps(room_dict))
     await publish_to_custom_room(
         room_id,
         {

@@ -1,5 +1,6 @@
 from typing import Dict, List
 from collections import defaultdict
+import redis.asyncio as aioredis
 from fastapi import WebSocket
 import asyncio
 
@@ -20,3 +21,4 @@ timer_tasks: Dict[int, asyncio.Task] = {}
 
 custom_game_rooms : Dict[int, List[WebSocket]] = defaultdict(list)
 room_listenner_tasks: Dict[int, List[asyncio.Task]] = defaultdict(list)
+room_pubsubs: dict[int, aioredis.client.PubSub] = {}
