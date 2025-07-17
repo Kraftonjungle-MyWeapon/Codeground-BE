@@ -13,7 +13,7 @@ from src.app.core.database import get_db
 from typing import Annotated
 router = APIRouter()
 DB = Annotated[Session, Depends(get_db)]
-RECONNECT_TIMEOUT = 5
+RECONNECT_TIMEOUT = 2
 
 @router.post("/create_room/{user_id}")
 async def create_room(db:DB,room : RoomCreateRequest, user_id : int):

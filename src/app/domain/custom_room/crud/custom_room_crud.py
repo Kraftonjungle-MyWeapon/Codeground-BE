@@ -332,7 +332,12 @@ async def pubsub_listener(room_id: int):
 # reason : surrender / abandon / finish / timeover
 async def process_custom_result(room_id: int, winner_id: int | None, reason : str):
     room = await get_room_info(room_id)
+    if not room.is_gaming:
+        return
 
+    room.is_gaming = False
+    room_dict = asdict(room)
+    await rds.set(f"room:{room_id}", json.dumps(room_dict))
     await publish_to_custom_room(
         room_id,
         {
