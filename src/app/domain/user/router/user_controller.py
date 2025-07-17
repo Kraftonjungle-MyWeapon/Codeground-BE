@@ -23,13 +23,15 @@ async def get_user_me(
     try:
         user = await service.get_user_data(db, current_user.user_id)
         user_mmr = await get_mmr_by_id(db, user.user_id)
-        mmr = user_mmr.rating if user_mmr.rating else 1000
+        mmr = user_mmr.rating if user_mmr and user_mmr.rating else 1000
         user_rank_info = await get_rank_by_id(db, user.user_id)
         user_rank = user_rank_info.rank if user_rank_info else 00
         user_dict = user.model_dump()
         user_dict["user_mmr"] = int(mmr)
         user_dict["user_rank"] = int(user_rank)
         user_dict["role"] = user.role.value if hasattr(user.role, "value") else str(user.role)
+
+        logger.info(f"Returning user profile for user ID: {current_user.user_id} with MMR: {user_dict['user_mmr']}")
 
         # ✅ profile 이미지 URL 절대경로로 변환
         if user_dict.get("profile_img_url") and not user_dict["profile_img_url"].startswith("http"):
@@ -48,11 +50,14 @@ async def update_my_profile_handler(
     nickname: Optional[str] = Form(None),
     current_password: Optional[str] = Form(None),
     new_password: Optional[str] = Form(None),
+    use_lang: Optional[str] = Form(None),
+    user_mmr: Optional[int] = Form(None),
     profile_image: Optional[UploadFile] = File(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     logger.info(f"Updating user profile for user ID: {current_user.user_id}")
+    logger.info(f"Received use_lang: {use_lang}, user_mmr: {user_mmr}")
 
     updated_user = await service.update_my_profile(
         db=db,
@@ -60,6 +65,8 @@ async def update_my_profile_handler(
         nickname=nickname,
         current_password=current_password,
         new_password=new_password,
+        use_lang=use_lang,
+        user_mmr=user_mmr,
         profile_image=profile_image,
     )
 

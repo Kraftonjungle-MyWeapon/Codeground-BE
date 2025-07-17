@@ -17,6 +17,8 @@ class UserUpdateRequest(BaseModel):
     nickname: Optional[str] = None
     current_password: Optional[str] = None
     new_password: Optional[str] = None
+    use_lang: Optional[str] = None
+    user_mmr: Optional[int] = None
 
 
 # ✅ 최소 정보 반환용
@@ -36,8 +38,6 @@ class UserResponseDto(BaseModel):
     user_rank: int
     model_config = {"from_attributes": True}
     profile_img_url: Optional[str] = None
-
-    model_config = {"from_attributes": True}
 
     @classmethod
     @model_validator(mode="before")
@@ -76,35 +76,7 @@ def parse_tier_from_mmr(mmr: int) -> tuple[str, int, int]:
     return "Unknown", 0, lp
 
 
-# ✅ tier_choice 문자열("bronze 3", "silver 1", 등) → 시작 MMR로 변환
-def convert_choice_to_mmr(tier_choice: str) -> int:
-    tier_base = {
-        "bronze": 1000,
-        "silver": 1500,
-        "gold": 2000,
-    }
 
-    # 예외 처리: 고정 티어
-    if tier_choice == "platinum+":
-        return 2500
-    if tier_choice == "unranked":
-        return 1000
-
-    try:
-        tier, level_str = tier_choice.lower().split()
-        level = int(level_str)
-
-        if tier not in tier_base:
-            raise ValueError(f"Unknown tier: {tier}")
-        if not 1 <= level <= 5:
-            raise ValueError("Level must be between 1 and 5")
-
-        base = tier_base[tier]
-        mmr = base + (5 - level) * 100  # 역순
-        return mmr
-
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid tier_choice: {e}")
 
 
 # ✅ 전체 사용자 정보 반환용 (MMR 자동 가공 포함)
