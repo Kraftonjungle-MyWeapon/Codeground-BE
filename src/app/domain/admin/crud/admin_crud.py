@@ -1,9 +1,16 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from src.app.models.models import User, CheatReport, Problem, MatchLog, UserMmr
+from src.app.models.models import Achievement, Match # Added Match
+from src.app.domain.admin.schemas.admin_schemas import AchievementCreate, AchievementUpdate, AdminProblemUpdate # Added AdminProblemUpdate
+from src.app.utils.s3_utils import issue_problem_urls, upload_bytes # Added S3 utilities
+from typing import Optional, List, Dict # Added for type hints
+from src.app.config.config import settings, BASE_DIR # Added settings, BASE_DIR
+from pathlib import Path # Added Path
 
-from src.app.models.models import Achievement
-from src.app.domain.admin.schemas.admin_schemas import AchievementCreate, AchievementUpdate
+
+ROOT_DIR = Path(__file__).resolve().parents[5]
+DATA_DIR = ROOT_DIR / "data"
 
 
 # 1. 유저 전체 목록 조회 (검색)
@@ -67,14 +74,103 @@ def update_problem_approval(db: Session, problem_id: int, is_approved: bool):
     return problem
 
 
-# 7. 문제 삭제
-def delete_problem(db: Session, problem_id: int):
+# 7. 문제 삭제 (기존 함수는 사용하지 않음)
+# def delete_problem(db: Session, problem_id: int):
+#     problem = db.query(Problem).filter(Problem.problem_id == problem_id).first()
+#     if problem:
+#         db.delete(problem)
+#         db.commit()
+#         return True
+#     return False
+
+# New functions for problem management
+
+async def get_problem_detail(db: Session, problem_id: int):
     problem = db.query(Problem).filter(Problem.problem_id == problem_id).first()
     if problem:
-        db.delete(problem)
-        db.commit()
-        return True
-    return False
+        s3_urls = await issue_problem_urls(problem)
+        return problem, s3_urls
+    return None, None
+
+async def update_problem_and_s3_content(
+    db: Session,
+    problem_id: int,
+    problem_update: AdminProblemUpdate,
+    problem_body_content: Optional[str] = None,
+    image_contents: Optional[Dict[str, bytes]] = None, # image_key: bytes
+):
+    db_problem = db.query(Problem).filter(Problem.problem_id == problem_id).first()
+    if not db_problem:
+        return None
+
+    # Update DB fields
+    update_data = problem_update.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        if value is not None: # Only update if value is not None
+            setattr(db_problem, key, value)
+
+    # Update S3/Local content and update body_key/image_keys in DB
+    if problem_body_content is not None:
+        # Determine the key based on environment (S3 or local static)
+        from src.app.config.config import settings
+        from pathlib import Path # Ensure Path is imported
+
+        if settings.ENV == "local":
+            # For local, save to data directory and update body_key to logical path
+            logical_body_key = f"problems/{problem_id}.json"
+            local_body_path = DATA_DIR / logical_body_key
+            local_body_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(local_body_path, "w", encoding="utf-8") as f:
+                f.write(problem_body_content)
+            db_problem.body_key = logical_body_key
+        else:
+            # For server, upload to S3 and update body_key to S3 key
+            s3_body_key = f"problems/{problem_id}.json"
+            upload_bytes(problem_body_content.encode('utf-8'), s3_body_key, bucket=settings.PROBLEM_BUCKET)
+            db_problem.body_key = s3_body_key
+
+    if image_contents:
+        from src.app.config.config import settings
+        from pathlib import Path # Ensure Path is imported
+
+        new_image_keys = []
+        for original_image_key, content_bytes in image_contents.items():
+            if settings.ENV == "local":
+                # For local, save to data directory and update image_key to logical path
+                logical_image_key = f"problems/{problem_id}/images/{Path(original_image_key).name}"
+                local_image_path = DATA_DIR / logical_image_key
+                local_image_path.parent.mkdir(parents=True, exist_ok=True)
+                with open(local_image_path, "wb") as fp:
+                    fp.write(content_bytes)
+                new_image_keys.append(logical_image_key)
+            else:
+                # For server, upload to S3 and update image_key to S3 key
+                s3_image_key = f"problems/{problem_id}/images/{Path(original_image_key).name}"
+                upload_bytes(content_bytes, s3_image_key, bucket=settings.PROBLEM_BUCKET)
+                new_image_keys.append(s3_image_key)
+        db_problem.image_keys = new_image_keys # Update the list of image keys in DB
+
+    db.commit()
+    db.refresh(db_problem)
+    return db_problem
+
+def delete_problem_and_related_matches(db: Session, problem_id: int):
+    problem = db.query(Problem).filter(Problem.problem_id == problem_id).first()
+    if not problem:
+        return False
+
+    # Update related MatchLog entries
+    db.query(MatchLog).filter(MatchLog.problem_id == problem_id).update(
+        {"problem_id": None}, synchronize_session=False # This will fail if problem_id is not nullable
+    )
+    # Update related Match entries
+    db.query(Match).filter(Match.problem_id == problem_id).update(
+        {"problem_id": None}, synchronize_session=False # This will fail if problem_id is not nullable
+    )
+
+    db.delete(problem)
+    db.commit()
+    return True
 
 
 # 8. 티어별 유저 수(분포) 집계

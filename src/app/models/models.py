@@ -99,7 +99,7 @@ class MatchFinishStatus(str, PyEnum):
 class Match(Base):
     __tablename__ = "match"
     match_id = Column(Integer, primary_key=True, autoincrement=True)
-    problem_id = Column(Integer, ForeignKey("problem.problem_id"))
+    problem_id = Column(Integer, ForeignKey("problem.problem_id"), nullable=True)
 
     matching_status = Column(Enum(MatchStatus), server_default="CREATED")
     ending_status = Column(Enum(MatchFinishStatus))
