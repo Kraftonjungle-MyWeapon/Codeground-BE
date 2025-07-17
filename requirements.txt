@@ -60,3 +60,4 @@ websockets==11.0.3
 scipy == 1.16.0
 APScheduler==3.11.0
 boto3 == 1.38.27
+redis == 6.2.0

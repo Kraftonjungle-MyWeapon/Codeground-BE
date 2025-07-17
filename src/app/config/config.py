@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     GITHUB_CLIENT_SECRET: str = os.environ.get("GITHUB_CLIENT_SECRET", "")
     REPORT_BUCKET: str = os.environ.get("REPORT_BUCKET", "")
     PROFILE_IMAGE_BUCKET: str = os.environ.get("PROFILE_IMAGE_BUCKET", "")
+    GITHUB_REDIRECT_URL: str = os.environ.get("GITHUB_REDIRECT_URL", "")
+    REDIS_HOST : str = os.environ.get("REDIS_HOST", "")
+    REDIS_PORT : int = os.environ.get("REDIS_PORT", "")
 
     class Config:
         env_file = ENV_PATH

@@ -7,6 +7,7 @@ class SubmitRequest(BaseModel):
     code: str
     problem_id: str
     match_id: int
+    is_public : bool
 
 
 class SubmitResponse(BaseModel):
