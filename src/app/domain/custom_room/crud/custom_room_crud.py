@@ -94,16 +94,10 @@ async def leave_from_room(room_id: int, user_id: int) -> None:
         room_dict["user"] = None
 
         await rds.set(f"room:{room_id}", json.dumps(room_dict))
-        await info_updated(room_id, "player_leave")
 
     else:
         room_dict["user"] = None
         await rds.set(f"room:{room_id}", json.dumps(room_dict))
-        # 퇴장 메시지만 발행
-        await publish_to_custom_room(
-            room_id,
-            {"type": "player_leave", "player_id": user_id}
-        )
 
 async def delete_room(room_id: int) -> None:
     #방에 연결된 WebSocket 들을 미리 꺼내두기
