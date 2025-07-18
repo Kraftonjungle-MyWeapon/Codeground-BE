@@ -14,6 +14,7 @@ from src.app.domain.match.schemas.match_schemas import MatchLogSchema
 from src.app.domain.game.crud.game_crud import get_problem_by_id
 from src.app.utils.logging import logger
 from itertools import count
+from src.app.utils.s3_utils import get_s3_public_url, PROFILE_IMAGE_BUCKET
 
 # 매칭 루프 타이머
 MATCH_INTERVAL = 1  # 초 세팅 0.5 = 500ms
@@ -102,7 +103,6 @@ class MatchService:
                 logger.info("Match service task cancelled successfully.")
             except asyncio.CancelledError:
                 logger.warning("Match service task was already cancelled.")
-                pass
 
 
 # 매칭된 사용자 쌍에게 매칭 완료 메시지 전송
@@ -120,7 +120,7 @@ async def dispatch_pairs(db: Session, pairs, algo):
             u2.id: False,
         }
 
-        # 각 사용자의 상세 정보 (닉네임, MMR) 조회
+        # 각 사용자의 상세 정보 (닉네임, MMR, 프로필 이미지) 조회
         user1_data = get_user_by_id(db, u1.id)
         user2_data = get_user_by_id(db, u2.id)
 
@@ -131,16 +131,30 @@ async def dispatch_pairs(db: Session, pairs, algo):
         user1_tier = mmr_to_tier(user1_mmr)
         user2_tier = mmr_to_tier(user2_mmr)
 
+        # 프로필 이미지 URL 생성
+        user1_profile_url = (
+            get_s3_public_url(PROFILE_IMAGE_BUCKET, user1_data.profile_img_url)
+            if user1_data.profile_img_url and not user1_data.profile_img_url.startswith("http")
+            else user1_data.profile_img_url
+        )
+        user2_profile_url = (
+            get_s3_public_url(PROFILE_IMAGE_BUCKET, user2_data.profile_img_url)
+            if user2_data.profile_img_url and not user2_data.profile_img_url.startswith("http")
+            else user2_data.profile_img_url
+        )
+
         # 각 사용자에게 전송할 상대방 정보 구성
         opponent1_info = {
             "id": user2_data.user_id,
             "nickname": user2_data.nickname,
             "tier": user2_tier,
+            "profile_img_url": user2_profile_url,  # 프로필 이미지 URL 추가
         }
         opponent2_info = {
             "id": user1_data.user_id,
             "nickname": user1_data.nickname,
             "tier": user1_tier,
+            "profile_img_url": user1_profile_url,  # 프로필 이미지 URL 추가
         }
 
         # u1에게 u2의 정보를 포함하여 매칭 완료 메시지 전송

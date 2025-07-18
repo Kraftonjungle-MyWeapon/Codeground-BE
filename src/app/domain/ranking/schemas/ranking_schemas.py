@@ -6,6 +6,7 @@ from pydantic import BaseModel
 class RankingEntry(BaseModel):
     user_id: int
     nickname: str
+    profile_img_url: Optional[str] = None
     mmr: int
     rank: int
     rank_diff: Optional[int] = 0

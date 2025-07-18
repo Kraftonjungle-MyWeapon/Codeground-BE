@@ -5,6 +5,7 @@ from src.app.domain.ranking.crud import ranking_crud as crud
 from src.app.domain.ranking.schemas import ranking_schemas as schemas
 from src.app.domain.user.crud.user_crud import get_user_by_id
 from src.app.models.models import UserMmr, Ranking
+from src.app.utils.s3_utils import get_s3_public_url, PROFILE_IMAGE_BUCKET
 from src.app.utils.tier_util import mmr_to_tier, tiers_cnt, tiers
 
 
@@ -16,6 +17,11 @@ async def get_language_ranking(db: Session, language: str) -> schemas.RankingLis
         schemas.RankingEntry(
             user_id=ranking.user_id,
             nickname=ranking.user.nickname,
+            profile_img_url=(
+                get_s3_public_url(PROFILE_IMAGE_BUCKET, ranking.user.profile_img_url)
+                if ranking.user.profile_img_url and not ranking.user.profile_img_url.startswith("http")
+                else ranking.user.profile_img_url
+            ),
             mmr=ranking.mmr,
             rank=ranking.rank,
             rank_diff=ranking.rank_diff or 0,
