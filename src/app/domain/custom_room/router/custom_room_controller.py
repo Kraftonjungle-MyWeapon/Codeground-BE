@@ -179,11 +179,10 @@ async def handle_custom_match_message(db : Session,websocket : WebSocket, room_i
 
         # 게임 타이머 시작 필요
         elif message_type == "game_start":
-            await crud.start_game(room_id)
             await crud.publish_to_custom_room(room_id, {"type": "game_start"})
             problem_info = await crud.get_random_problem(db, room_id)
             presigned = await issue_problem_urls(problem_info)
-
+            await crud.start_game(room_id)
             msg = {
                 "type": "get_problem",
                 "problem": {
