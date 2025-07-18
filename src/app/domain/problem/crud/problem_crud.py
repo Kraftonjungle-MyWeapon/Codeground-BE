@@ -12,7 +12,7 @@ async def get_random_problem(db: Session, tier: str) -> type[Problem]:
     except ValueError:
         raise ValueError(f"Invalid tier: {tier}")
 
-    problem = db.query(Problem).filter(Problem.difficulty == tier_enum).order_by(func.random()).first()
+    problem = db.query(Problem).filter(Problem.difficulty == tier_enum, Problem.is_approved == True).order_by(func.random()).first()
     if problem is None:
         raise Exception("No problems exist")
     return problem
@@ -28,7 +28,7 @@ async def get_random_problem_for_custom(db: Session, mask : int, tier: str) -> O
         if mask & (1 << idx):
             categories.append(name)
 
-    problem = db.query(Problem).filter(Problem.difficulty == tier_enum, Problem.category.overlap(categories)).order_by(func.random()).first()
+    problem = db.query(Problem).filter(Problem.difficulty == tier_enum, Problem.category.overlap(categories), Problem.is_approved == True).order_by(func.random()).first()
     if problem is None:
         raise Exception("No problems exist")
     return problem
