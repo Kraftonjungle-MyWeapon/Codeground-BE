@@ -1,0 +1,42 @@
+{
+  "problem_id": "prob-006",
+  "title": "최대 유량",
+  "description": "네트워크의 각 간선의 용량이 주어질 때, 최대 유량을 구하시오.",
+  "input_format": "첫째 줄에 노드 수 n(2 ≤ n ≤ 100), 간선 수 m(1 ≤ m ≤ 1000)이 주어진다. 이후 m개의 줄에 출발, 도착, 용량 정보가 주어진다.",
+  "output_format": "최대 유량을 출력한다.",
+  "sample_input": "4 5\n1 2 40\n1 3 20\n2 3 10\n2 4 30\n3 4 20",
+  "sample_output": "50",
+  "time_limit_milliseconds": "2000",
+  "memory_limit_kilobytes": "262144",
+  "difficulty": "challenger",
+  "category": [
+    "그래프",
+    "유량"
+  ],
+  "languages": [
+    "c",
+    "cpp",
+    "java",
+    "python"
+  ],
+  "test_cases": [
+    {
+      "id": 1,
+      "input": "4 5\n1 2 40\n1 3 20\n2 3 10\n2 4 30\n3 4 20",
+      "output": "50",
+      "visibility": "public"
+    },
+    {
+      "id": 2,
+      "input": "3 3\n1 2 10\n1 3 5\n2 3 15",
+      "output": "5",
+      "visibility": "public"
+    },
+    {
+      "id": 3,
+      "input": "2 1\n1 2 100",
+      "output": "100",
+      "visibility": "hidden"
+    }
+  ]
+}

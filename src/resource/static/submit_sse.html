@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Code Submission SSE Demo</title>
+    <style>
+      body { font-family: sans-serif; margin: 2rem; }
+      textarea { width: 100%; height: 200px; }
+      pre { background: #f0f0f0; padding: 1rem; white-space: pre-wrap; }
+    </style>
+  </head>
+  <body>
+    <h1>Submit Code via SSE</h1>
+    <div>
+      <label>Language:
+        <select id="language">
+          <option value="python">python</option>
+          <option value="cpp">cpp</option>
+          <option value="java">java</option>
+          <option value="c">c</option>
+        </select>
+      </label>
+      <label>Problem ID: <input id="problemId" value="prob-001" /></label>
+    </div>
+    <textarea id="code">print(input())</textarea>
+    <div>
+      <button id="submit">Run</button>
+    </div>
+    <pre id="output"></pre>
+    <script>
+      document.getElementById('submit').onclick = async () => {
+        const output = document.getElementById('output');
+        output.textContent = '';
+        const response = await fetch('/api/v1/game/submit', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'text/event-stream'
+          },
+          body: JSON.stringify({
+            language: document.getElementById('language').value,
+            code: document.getElementById('code').value,
+            problem_id: document.getElementById('problemId').value
+          })
+        });
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let buffer = '';
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          let parts = buffer.split('\r\n\r\n');
+          buffer = parts.pop();
+          for (const chunk of parts) {
+            const line = chunk.trim();
+            if (line.startsWith(':')) {
+              // ping comment
+              continue;
+            }
+            if (line.startsWith('data:')) {
+              const data = line.slice(5).trim();
+              output.textContent += data + '\n';
+            }
+          }
+        }
+      };
+    </script>
+  </body>
+</html>

@@ -3,6 +3,9 @@
 # Learn more about .gitignore:
 #     https://www.atlassian.com/git/tutorials/saving-changes/gitignore
 
+.vscode
+.env
+
 # Node artifact files
 node_modules/
 dist/
@@ -67,3 +70,8 @@ prof/*
 /htmlcov/
 /tests/htmlcov/
 /.env
+/.venv
+/migration/versions/
+/src/resource/static/reports/
+/data/
+/data/

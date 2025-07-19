@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>CodeArena WebRTC Test</title>
+    <style>
+      video {
+        width: 30%;
+        margin: 1%;
+        background: #000;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>CodeArena WebRTC Test</h1>
+    <div>
+      <input id="room" placeholder="Room" />
+      <input id="name" placeholder="Username" />
+      <button id="join">Join</button>
+    </div>
+    <div>
+      <video id="localVideo" autoplay playsinline></video>
+    </div>
+    <div id="remoteVideos"></div>
+    <script>
+      let ws;
+      let localStream;
+      let name;
+      const peerConnections = {};
+
+      function createPeerConnection(peer) {
+        const pc = new RTCPeerConnection({
+          iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+        });
+        peerConnections[peer] = pc;
+        localStream
+          .getTracks()
+          .forEach((track) => pc.addTrack(track, localStream));
+        pc.onicecandidate = ({ candidate }) => {
+          if (candidate) {
+            ws.send(
+              JSON.stringify({
+                type: "candidate",
+                from: name,
+                to: peer,
+                candidate,
+              }),
+            );
+          }
+        };
+        pc.ontrack = ({ streams: [stream] }) => {
+          let video = document.getElementById(`remote-${peer}`);
+          if (!video) {
+            video = document.createElement("video");
+            video.id = `remote-${peer}`;
+            video.autoplay = true;
+            video.playsInline = true;
+            document.getElementById("remoteVideos").appendChild(video);
+          }
+          video.srcObject = stream;
+        };
+        return pc;
+      }
+
+      document.getElementById("join").onclick = async () => {
+        const room = document.getElementById("room").value;
+        name =
+          document.getElementById("name").value ||
+          `user-${Math.random().toString(36).slice(2, 7)}`;
+        if (!room) return alert("Room required");
+
+        localStream = await navigator.mediaDevices.getDisplayMedia({
+          video: { cursor: "always" },
+          audio: true,
+        });
+        document.getElementById("localVideo").srcObject = localStream;
+
+        const protocol = location.protocol === "https:" ? "wss" : "ws";
+        ws = new WebSocket(
+          `${protocol}://${location.host}/api/v1/ws/webrtc/${room}?username=${encodeURIComponent(name)}`,
+        );
+
+        ws.onmessage = async ({ data }) => {
+          const msg = JSON.parse(data);
+          if (msg.to && msg.to !== name) return;
+
+          if (msg.type === "join") {
+            if (msg.from === name) return;
+            const pc = createPeerConnection(msg.from);
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            ws.send(
+              JSON.stringify({
+                ...pc.localDescription.toJSON(),
+                type: "offer",
+                from: name,
+                to: msg.from,
+              }),
+            );
+          } else if (msg.type === "offer") {
+            if (msg.from === name) return;
+            const pc =
+              peerConnections[msg.from] || createPeerConnection(msg.from);
+            await pc.setRemoteDescription(new RTCSessionDescription(msg));
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            ws.send(
+              JSON.stringify({
+                ...pc.localDescription.toJSON(),
+                type: "answer",
+                from: name,
+                to: msg.from,
+              }),
+            );
+          } else if (msg.type === "answer") {
+            const pc = peerConnections[msg.from];
+            if (pc) {
+              await pc.setRemoteDescription(new RTCSessionDescription(msg));
+            }
+          } else if (msg.type === "candidate") {
+            const pc = peerConnections[msg.from];
+            if (pc && msg.candidate) {
+              await pc.addIceCandidate(msg.candidate);
+            }
+          } else if (msg.type === "leave") {
+            const pc = peerConnections[msg.from];
+            if (pc) {
+              pc.close();
+              delete peerConnections[msg.from];
+            }
+            const video = document.getElementById(`remote-${msg.from}`);
+            if (video) {
+              video.remove();
+            }
+          }
+        };
+
+        ws.onopen = () => {
+          ws.send(JSON.stringify({ type: "join", from: name }));
+        };
+      };
+    </script>
+  </body>
+</html>

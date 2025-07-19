@@ -1,0 +1,42 @@
+{
+  "problem_id": "prob-004",
+  "title": "최단 경로",
+  "description": "n개의 노드와 m개의 간선으로 이루어진 그래프가 주어진다. 1번 노드에서 모든 노드까지의 최단 경로 길이를 구하시오.",
+  "input_format": "첫째 줄에 정수 n, m(1 ≤ n ≤ 1000, 1 ≤ m ≤ 10000)이 주어진다. 이후 m개의 줄에 간선 정보가 u v w(1 ≤ u, v ≤ n, 1 ≤ w ≤ 100)가 주어진다.",
+  "output_format": "1번 노드에서 각 노드까지의 최단 경로 길이를 한 줄에 하나씩 출력한다.",
+  "sample_input": "4 4\n1 2 2\n1 3 5\n2 3 1\n3 4 2",
+  "sample_output": "0\n2\n3\n5",
+  "time_limit_milliseconds": "2000",
+  "memory_limit_kilobytes": "262144",
+  "difficulty": "platinum",
+  "category": [
+    "그래프",
+    "다익스트라"
+  ],
+  "languages": [
+    "c",
+    "cpp",
+    "java",
+    "python"
+  ],
+  "test_cases": [
+    {
+      "id": 1,
+      "input": "4 4\n1 2 2\n1 3 5\n2 3 1\n3 4 2",
+      "output": "0\n2\n3\n5",
+      "visibility": "public"
+    },
+    {
+      "id": 2,
+      "input": "3 2\n1 2 3\n2 3 4",
+      "output": "0\n3\n7",
+      "visibility": "public"
+    },
+    {
+      "id": 3,
+      "input": "2 1\n1 2 10",
+      "output": "0\n10",
+      "visibility": "hidden"
+    }
+  ]
+}

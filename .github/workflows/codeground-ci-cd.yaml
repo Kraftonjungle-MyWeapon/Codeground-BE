@@ -1,0 +1,85 @@
+name: Codegound CI/CD
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    if: github.repository_owner == 'Kraftonjungle-MyWeapon'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ap-northeast-2
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
+          # role-session-name, duration-seconds는 필요시 추가
+
+      - name: Set up Docker Build
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and Push Docker image to ECR
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+      - name: Fill in new image ID in ECS task definition
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: ${{ secrets.ECS_TASKDEF_FILE_PATH }}  # 예: .aws/ecs-task-def.json
+          container-name: ${{ secrets.CONTAINER_NAME }}          # 예: codeground-backend
+          image: ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}
+
+      - name: Deploy Amazon ECS task definition
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          service: ${{ secrets.ECS_SERVICE_NAME }}
+          cluster: ${{ secrets.ECS_CLUSTER_NAME }}
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          wait-for-service-stability: true
+          
+      - name: Retry ECS deployment if previous step failed
+        if: failure()  # 이전 스텝이 실패한 경우에만 실행
+        env:
+          ECS_CLUSTER_NAME: ${{ secrets.ECS_CLUSTER_NAME }}
+          ECS_SERVICE_NAME: ${{ secrets.ECS_SERVICE_NAME }}
+          TASK_DEF_ARN: ${{ steps.task-def.outputs.task-definition }}
+        run: |
+          for i in {1..5}; do
+            echo "ECS Deploy attempt $i..."
+            set +e
+            aws ecs update-service \
+              --cluster $ECS_CLUSTER_NAME \
+              --service $ECS_SERVICE_NAME \
+              --task-definition $TASK_DEF_ARN \
+              --force-new-deployment
+            status=$?
+            set -e
+            if [ "$status" = "0" ]; then
+              echo "Deploy succeeded"
+              break
+            fi
+            echo "Waiting 180 seconds before retry..."
+            sleep 180
+          done

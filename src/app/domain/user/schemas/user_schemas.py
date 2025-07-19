@@ -1,0 +1,135 @@
+from pydantic import BaseModel, EmailStr, ConfigDict, model_validator
+from typing import Optional
+from datetime import datetime
+from fastapi import HTTPException
+from src.app.utils.s3_utils import get_s3_public_url, PROFILE_IMAGE_BUCKET
+
+
+# ✅ MMR 상세 표현용
+class MyMmr(BaseModel):
+    name: Optional[str] = None  # 티어 이름 (예: 브론즈, 실버)
+    level: Optional[int] = None  # 단계 (로마자: I, II, III, IV, V)
+    lp: Optional[int] = None  # LP 점수
+
+
+# ✅ 사용자 정보 수정 요청
+class UserUpdateRequest(BaseModel):
+    nickname: Optional[str] = None
+    current_password: Optional[str] = None
+    new_password: Optional[str] = None
+    use_lang: Optional[str] = None
+    user_mmr: Optional[int] = None
+
+
+# ✅ 최소 정보 반환용
+class UserResponse(BaseModel):
+    email: EmailStr
+
+
+# ✅ 단순 사용자 정보 반환용
+class UserResponseDto(BaseModel):
+    user_id: int
+    email: str
+    username: str
+    nickname: str
+    role: str
+    use_lang: str
+    user_mmr: int
+    user_rank: int
+    model_config = {"from_attributes": True}
+    profile_img_url: Optional[str] = None
+
+    @classmethod
+    @model_validator(mode="before")
+    def convert_profile_url(cls, values: dict):
+        raw_profile = values.get("profile_img_url")
+        if raw_profile and not raw_profile.startswith("http"):
+            values["profile_img_url"] = get_s3_public_url(PROFILE_IMAGE_BUCKET, raw_profile)
+        return values
+
+
+# ✅ 사용자 요청 DTO
+class UserRequestDto(BaseModel):
+    user_id: int
+    email: str
+    username: str
+    nickname: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ✅ MMR → 티어명 + 숫자레벨 + LP 변환
+def parse_tier_from_mmr(mmr: int) -> tuple[str, int, int]:
+    tiers = ["bronze", "silver", "gold", "platinum", "diamond", "challenger"]
+    base_mmr = 1000
+    lp = mmr % 100
+    mmr_without_lp = mmr - lp
+    gap = (mmr_without_lp - base_mmr) // 100  # 단계 수
+    tier_index = gap // 5
+    level_num = 5 - (gap % 5)  # 5~1
+
+    if 0 <= tier_index < len(tiers) and 1 <= level_num <= 5:
+        name = tiers[tier_index]
+        level = level_num  # 숫자 그대로 반환
+        return name, level, lp
+
+    return "Unknown", 0, lp
+
+
+
+
+
+# ✅ 전체 사용자 정보 반환용 (MMR 자동 가공 포함)
+class UserDto(BaseModel):
+    user_id: int
+    email: str
+    username: str
+    nickname: str
+    role: str
+    use_lang: str
+    profile_img_url: Optional[str] = None
+    my_mmr: Optional[MyMmr] = None  # 변환된 형태로 제공
+
+    model_config = ConfigDict(from_attributes=True)
+
+    @classmethod
+    @model_validator(mode="before")
+    def parse_mmr(cls, values: dict):
+        raw_mmr = values.get("my_mmr")
+        if isinstance(raw_mmr, int):
+            name, level, lp = parse_tier_from_mmr(raw_mmr)
+            values["my_mmr"] = MyMmr(name=name, level=level, lp=lp)
+
+        # ✅ profile_img_url 처리 (S3 key -> 전체 URL)
+        raw_profile = values.get("profile_img_url")
+        if raw_profile and not raw_profile.startswith("http"):
+            values["profile_img_url"] = get_s3_public_url(PROFILE_IMAGE_BUCKET, raw_profile)
+
+        return values
+
+
+# ✅ 최근 경기 기록용
+class MatchRecord(BaseModel):
+    match_id: int
+    result: str
+    played_at: datetime
+
+
+# ✅ 마이페이지에서 최근 경기 포함 응답
+class UserResponseWithMatches(UserResponse):
+    recent_matches: list[MatchRecord] = []
+
+
+class UserUpdateResponse(BaseModel):
+    message: str
+    user: UserResponseDto
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class UserSignupRequest(BaseModel):
+    email: EmailStr
+    username: str
+    password: str
+    nickname: str
+    use_lang: str  # Python, Java, C, C++

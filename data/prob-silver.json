@@ -1,0 +1,72 @@
+{
+  "problem_id": "prob-002",
+  "title": "괄호의 유효성 검사",
+  "description": "여러 개의 괄호로 이루어진 문자열이 주어졌을 때, 올바른 괄호 문자열인지 판별하시오.",
+  "input_format": "첫째 줄에 괄호로 이루어진 문자열 S가 주어진다. (1 <= |S| <= 100)",
+  "output_format": "올바른 괄호 문자열이면 YES, 아니면 NO를 출력한다.",
+  "sample_input": "(()())",
+  "sample_output": "YES",
+  "time_limit_milliseconds": "2000",
+  "memory_limit_kilobytes": "262144",
+  "difficulty": "silver",
+  "category": [
+    "구현",
+    "스택"
+  ],
+  "languages": [
+    "c",
+    "cpp",
+    "java",
+    "python"
+  ],
+  "test_cases": [
+    {
+      "id": 1,
+      "input": "()",
+      "output": "YES",
+      "visibility": "public"
+    },
+    {
+      "id": 2,
+      "input": "()()",
+      "output": "YES",
+      "visibility": "public"
+    },
+    {
+      "id": 3,
+      "input": "(()())",
+      "output": "YES",
+      "visibility": "public"
+    },
+    {
+      "id": 4,
+      "input": "())(",
+      "output": "NO",
+      "visibility": "public"
+    },
+    {
+      "id": 5,
+      "input": "(())(",
+      "output": "NO",
+      "visibility": "hidden"
+    },
+    {
+      "id": 6,
+      "input": ")(",
+      "output": "NO",
+      "visibility": "hidden"
+    },
+    {
+      "id": 7,
+      "input": "((()()))()",
+      "output": "YES",
+      "visibility": "hidden"
+    },
+    {
+      "id": 8,
+      "input": "(((((((((())))))))))",
+      "output": "YES",
+      "visibility": "hidden"
+    }
+  ]
+}
