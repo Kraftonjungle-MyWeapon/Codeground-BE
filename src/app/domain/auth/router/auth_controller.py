@@ -2,15 +2,16 @@ from typing import Annotated
 import traceback
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Response, Request # Added Request
 
 from src.app.config.config import settings
 from src.app.core.database import get_db
 from src.app.domain.auth.schemas import auth_schemas as schemas
 from src.app.domain.auth.service import auth_service as service
-from src.app.core.token import create_access_token
+from src.app.core.token import create_access_token, create_refresh_token, decode_token # Added create_refresh_token, decode_token
 from src.app.domain.auth.crud import auth_crud as crud
 from src.app.utils.logging import logger
+from src.app.models.models import RefreshToken, User # Added RefreshToken, User
 
 router = APIRouter(prefix="/auth")
 
@@ -26,23 +27,25 @@ def get_cookie_options():
         return True, "none", ".code-ground.com", True
 
 
-def set_access_token_cookie(response: Response, access_token: str):
+def set_token_cookie(response: Response, key: str, value: str, max_age: int):
     secure, samesite, domain, http_only = get_cookie_options()
 
+    logger.info(f"[COOKIE SET] {key} | Secure: {secure} | HttpOnly: {http_only} | SameSite: {samesite} | Domain: {domain}")
+
     cookie_params = {
-        "key": "access_token",
-        "value": access_token,
+        "key": key,
+        "value": value,
         "httponly": http_only,
-        "max_age": 60 * 60 * 24,
+        "max_age": max_age,
         "secure": secure,
         "samesite": samesite,
         "path": "/",
     }
-
     if domain:
         cookie_params["domain"] = domain
 
     response.set_cookie(**cookie_params)
+
 
 
 @router.post("/sign-up")
@@ -51,23 +54,28 @@ async def sign_up(sign_up_request: schemas.SignupRequest, db: DB, response: Resp
     try:
         await service.check_duplicate_email(db, str(sign_up_request.email))
         await service.check_duplicate_nickname(db, sign_up_request.nickname)
-        await service.join(db, sign_up_request)
+        user = await service.join(db, sign_up_request) # Modified to get user object
         db.commit()
 
         access_token = create_access_token(subject=str(sign_up_request.email))
+        refresh_token = create_refresh_token(subject=str(sign_up_request.email))
+
+        # Save refresh token to DB
+        db_refresh_token = RefreshToken(
+            user_id=user.user_id,
+            user_email=user.email,
+            refresh_token=refresh_token
+        )
+        db.add(db_refresh_token)
+        db.commit()
+        db.refresh(db_refresh_token)
 
         # 환경에 따라 쿠키 옵션 분기 (가독성 및 실수 방지)
-        secure, samesite, domain, http_only = get_cookie_options()
-        response.set_cookie(
-            key="access_token",
-            value=access_token,
-            httponly=http_only,
-            max_age=60 * 60 * 24,
-            secure=secure,
-            samesite=samesite,
-            path="/",
-            domain=domain,
-        )
+        # Access Token Cookie
+        set_token_cookie(response, "access_token", access_token, settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60)
+        # Refresh Token Cookie
+        set_token_cookie(response, "refresh_token", refresh_token, settings.REFRESH_TOKEN_EXPIRE_MINUTES * 60)
+
         logger.info(f"User {sign_up_request.email} signed up successfully")
         return schemas.TokenResponse(access_token=access_token, token_type="bearer")
 
@@ -96,19 +104,27 @@ async def login(
             raise HTTPException(status_code=403, detail="유저는 현재 정지 상태입니다.")
 
         access_token = create_access_token(subject=user.email)
+        refresh_token = create_refresh_token(subject=user.email)
 
-        # 환경에 따라 쿠키 옵션 분기 (가독성 및 실수 방지)
-        secure, samesite, domain, http_only = get_cookie_options()
-        response.set_cookie(
-            key="access_token",
-            value=access_token,
-            httponly=http_only,
-            max_age=60 * 60 * 24,
-            secure=secure,
-            samesite=samesite,
-            path="/",
-            domain=domain,
+        # 기존 refresh token 삭제 (RTR)
+        db.query(RefreshToken).filter(RefreshToken.user_id == user.user_id).delete()
+        db.commit()
+
+        # 새로운 refresh token 저장
+        db_refresh_token = RefreshToken(
+            user_id=user.user_id,
+            user_email=user.email,
+            refresh_token=refresh_token
         )
+        db.add(db_refresh_token)
+        db.commit()
+        db.refresh(db_refresh_token)
+
+        # Access Token Cookie
+        set_token_cookie(response, "access_token", access_token, settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60)
+        # Refresh Token Cookie
+        set_token_cookie(response, "refresh_token", refresh_token, settings.REFRESH_TOKEN_EXPIRE_MINUTES * 60)
+
         logger.info(f"User {form_data.username} logged in successfully")
         return {"access_token": access_token, "token_type": "bearer"}
 
@@ -118,6 +134,64 @@ async def login(
     except Exception as e:
         logger.error(f"Login error for {form_data.username}: {repr(e)}")
         raise HTTPException(status_code=500, detail="서버 오류로 로그인에 실패했습니다.")
+
+
+@router.post("/refresh")
+async def refresh_token(request: Request, db: DB, response: Response):
+    refresh_token_cookie = request.cookies.get("refresh_token")
+    if not refresh_token_cookie:
+        raise HTTPException(status_code=401, detail="Refresh token not found in cookies")
+
+    try:
+        email = decode_token(refresh_token_cookie)
+        if not email:
+            raise HTTPException(status_code=401, detail="Invalid refresh token")
+
+        user = db.query(User).filter(User.email == email).first()
+        if not user:
+            raise HTTPException(status_code=401, detail="User not found")
+
+        db_refresh_token = db.query(RefreshToken).filter(
+            RefreshToken.user_id == user.user_id,
+            RefreshToken.user_email == user.email,
+            RefreshToken.refresh_token == refresh_token_cookie
+        ).first()
+
+        if not db_refresh_token:
+            raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
+
+        # Generate new tokens
+        new_access_token = create_access_token(subject=user.email)
+        new_refresh_token = create_refresh_token(subject=user.email)
+
+        # Update refresh token in DB
+        db_refresh_token.refresh_token = new_refresh_token
+        db.add(db_refresh_token)
+        db.commit()
+        db.refresh(db_refresh_token)
+
+        # Set new tokens as cookies
+        set_token_cookie(response, "access_token", new_access_token, settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60)
+        set_token_cookie(response, "refresh_token", new_refresh_token, settings.REFRESH_TOKEN_EXPIRE_MINUTES * 60)
+
+        logger.info(f"Tokens refreshed for user: {user.email}")
+        return {"access_token": new_access_token, "token_type": "bearer"}
+
+    except HTTPException as e:
+        logger.warning(f"Refresh token failed: {e.detail}")
+        raise e
+    except Exception as e:
+        logger.error(f"Error during token refresh: {repr(e)}")
+        raise HTTPException(status_code=500, detail="서버 오류로 토큰 갱신에 실패했습니다.")
+
+
+@router.post("/logout")
+async def logout(response: Response):
+    # Access Token Cookie
+    set_token_cookie(response, "access_token", "", 0)
+    # Refresh Token Cookie
+    set_token_cookie(response, "refresh_token", "", 0)
+    return {"message": "로그아웃 성공"}
 
 
 @router.post("/reset-password/request")

@@ -67,12 +67,14 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         content={"detail": exc.errors(), "body": decoded_body},
     )
 
+
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     return JSONResponse(
         status_code=exc.status_code,
         content={"detail": exc.detail},
     )
+
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
@@ -83,12 +85,6 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
     )
 
 
-
-# 미들웨어 등록
-app.add_middleware(DomainLimiterMiddleware)
-app.middleware("http")(logging_middleware.log_requests)
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ALLOWED_ORIGINS,  # 위에서 설정된 도메인
@@ -96,6 +92,11 @@ app.add_middleware(
     allow_methods=["*"],  # 모든 HTTP 메소드 허용 (또는 필요한 메소드만 설정)
     allow_headers=["*"],  # 모든 헤더 허용 (필요한 헤더만 설정해도 좋음)
 )
+
+# 미들웨어 등록
+app.add_middleware(DomainLimiterMiddleware)
+app.middleware("http")(logging_middleware.log_requests)
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 app.include_router(router=achievement_router, prefix=settings.API_V1_STR)
 app.include_router(router=auth_router, prefix=settings.API_V1_STR)

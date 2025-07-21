@@ -38,6 +38,14 @@ class User(Base):
     user_achievements = relationship("UserAchievement", back_populates="user")  # 추가된 부분
 
 
+class RefreshToken(Base):
+    __tablename__ = "refresh_tokens"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, nullable=False, index=True)
+    user_email = Column(String(255), nullable=False)
+    refresh_token = Column(Text, nullable=False)
+
+
 class UserMmr(Base):
     __tablename__ = "user_mmr"
     mmr_id = Column(Integer, primary_key=True)
@@ -76,7 +84,7 @@ class MatchLog(Base):
     submission_count = Column(Integer, default=0)  # 제출 횟수
     mmr_earned = Column(Float, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    opponent_id = Column(Integer, nullable=False)
+    opponent_id = Column(Integer, nullable=True)
     opponent_mmr = Column(Float, nullable=False)
     opponent_rd = Column(Float, nullable=False)
     is_consumed = Column(Boolean, server_default=text("FALSE"))
@@ -182,9 +190,9 @@ class CheatReport(Base):
     description = Column(Text, nullable=True)
     video_path = Column(Text, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    reported_user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)     # 신고 당한 사람 O, 신고를 한 사람 X
-    reporter_user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)     # 신고를 한 사람 O
-    is_approved = Column(Boolean, nullable=True)    # 관리자가 승인 O -> True, X -> False, 대기중 -> Null
+    reported_user_id = Column(Integer, ForeignKey("users.user_id"), nullable=True)  # 신고 당한 사람 O, 신고를 한 사람 X
+    reporter_user_id = Column(Integer, ForeignKey("users.user_id"), nullable=True)  # 신고를 한 사람 O
+    is_approved = Column(Boolean, nullable=True)  # 관리자가 승인 O -> True, X -> False, 대기중 -> Null
 
 
 # ———————————————— 사용자별 업적 진행 현황 ————————————————
@@ -262,8 +270,6 @@ class Achievement(Base):
     # — 카테고리 연결 —
     achievement_category_id = Column(Integer, ForeignKey("achievement_category.achievement_category_id"), nullable=True)
     category = relationship("AchievementCategory", back_populates="achievements")
-
-    
 
     # — 보상 정보 —
     reward_type = Column(Enum(RewardType), nullable=False, server_default=RewardType.BADGE.value)
