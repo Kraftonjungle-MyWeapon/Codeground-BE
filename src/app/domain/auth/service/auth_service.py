@@ -9,7 +9,7 @@ from src.app.core.password import get_password_hash, verify_password
 from src.app.utils.email import send_email
 from src.app.utils.logging import logger
 from src.app.domain.achievement.service import achievement_service
-from src.app.models.models import AchievementTriggerType
+from src.app.models.models import AchievementTriggerType, User
 
 reset_code_store = {}
 
@@ -42,8 +42,7 @@ async def join(db: Session, sign_up_request: schemas.SignupRequest) -> schemas.S
     logger.info(f"User {sign_up_request.email} joined successfully")
     return schemas.SignupResponse.model_validate(new_user)
 
-
-async def authenticate_user(db: Session, email: str, password: str) -> schemas.LoginUserDto:
+async def authenticate_user(db: Session, email: str, password: str) -> User:
     logger.info(f"Authenticating user: {email}")
     user = crud.get_user_by_email(db, email)
 
@@ -69,10 +68,8 @@ async def authenticate_user(db: Session, email: str, password: str) -> schemas.L
             detail="이메일 또는 비밀번호가 올바르지 않습니다.",
         )
 
-    
-
     logger.info(f"User {email} authenticated successfully")
-    return schemas.LoginUserDto.model_validate(user)
+    return user
 
 
 def check_email_exists(db: Session, email: str) -> bool:

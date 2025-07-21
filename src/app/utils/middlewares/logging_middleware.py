@@ -155,7 +155,7 @@ async def log_requests(request: Request, call_next):
     return Response(
         content=b"".join(new_body),
         status_code=response.status_code,
-        headers=dict(response.headers),
+        headers=response.headers,
         media_type=response.media_type,
         background=task,
     )

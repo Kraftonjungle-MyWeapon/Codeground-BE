@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = os.environ.get("ENV", "DEV")
     # CORS_ALLOWED_ORIGINS: List[str] = []
     SITE_DOMAIN: str = "codeground"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 5
     REFRESH_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 14
     SECRET_KEY: str = os.environ.get("SECRET_KEY", "")
     SECRET_KEY_AUTH: str = os.environ.get("SECRET_KEY_AUTH", "")

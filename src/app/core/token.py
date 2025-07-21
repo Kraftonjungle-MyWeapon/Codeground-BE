@@ -14,8 +14,8 @@ def create_access_token(
     subject: str,
     expires_delta: Optional[int] = None,
     key: str = settings.SECRET_KEY,
-    issuer: str = "codeground",
-    audience: Optional[str] = "codeground",
+    issuer: str = "code-ground",
+    audience: Optional[str] = "code-ground",
 ) -> str:
     now = datetime.now(timezone.utc)
     expire = now + timedelta(minutes=expires_delta or settings.ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -32,7 +32,29 @@ def create_access_token(
     return encoded_jwt
 
 
-def decode_token(token: str, key: str = settings.SECRET_KEY, issuer: str = "codeground", audience: str = "codeground"):
+def create_refresh_token(
+        subject: str,
+        expires_delta: Optional[int] = None,
+        key: str = settings.SECRET_KEY,
+        issuer: str = "code-ground",
+        audience: Optional[str] = "code-ground",
+) -> str:
+    now = datetime.now(timezone.utc)
+    expire = now + timedelta(minutes=expires_delta or settings.REFRESH_TOKEN_EXPIRE_MINUTES)
+
+    payload = {
+        "sub": subject,
+        "iat": int(now.timestamp()),
+        "exp": int(expire.timestamp()),
+        "iss": issuer,
+        "aud": audience,
+        "jti": str(uuid4()),
+    }
+    encoded_jwt = jwt.encode(payload, key, algorithm=ALGORITHM)
+    return encoded_jwt
+
+
+def decode_token(token: str, key: str = settings.SECRET_KEY, issuer: str = "code-ground", audience: str = "code-ground"):
     try:
         payload = jwt.decode(token, key, algorithms=[ALGORITHM], audience=audience, issuer=issuer)
         return payload.get("sub")
